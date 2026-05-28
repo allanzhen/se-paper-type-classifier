@@ -30,6 +30,11 @@ QUERIES = [
     "design debt",
     "test debt",
     "documentation debt",
+    "self-admitted technical debt",
+    "satd",
+    "requirements debt",
+    "infrastructure debt",
+    "build debt",
 ]
 
 # The bulk endpoint returns up to 1000 results per call, making it more
@@ -81,7 +86,12 @@ def _request_bulk(query: str, token: str | None) -> dict:
         RateLimited: If the API returns HTTP 429, triggering a retry.
     """
     
-    params: dict[str, str] = {"query": query, "fields": FIELDS}
+    params: dict[str, str] = {
+        "query": query,
+        "fields": FIELDS,
+        # Filter to CS papers only, some quieries return irrelevant papers from other fields
+        "fieldsOfStudy": "Computer Science",
+    }
     if token:
         params["token"] = token
     response = requests.get(

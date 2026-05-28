@@ -56,6 +56,8 @@ _NORMALISE_PREFIXES = [
 _YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 _ORDINAL_RE = re.compile(r"\b\d+(?:st|nd|rd|th)\b")
 _PAREN_RE = re.compile(r"\s*\([^)]*\)")
+_PARENS_CAPTURE_RE = re.compile(r"\(([^)]+)\)")
+_TRAILING_DIGITS_RE = re.compile(r"\d+$")
 _WHITESPACE_RE = re.compile(r"\s+")
 
 
@@ -65,16 +67,47 @@ def normalise(venue: str | None) -> str:
         return ""
     s = venue.lower().strip()
     s = s.replace("&", "and")
+    s = s.replace(",", " ")  # drop Oxford-comma differences (CORE vs Semantic Scholar)
     s = _YEAR_RE.sub("", s)
     s = _ORDINAL_RE.sub("", s)
     s = _PAREN_RE.sub("", s)  # drop "(TechDebt)", "(was ESEC/FSE)", etc.
     s = s.split(":")[0]  # drop subtitles, e.g. "EMSE: an international journal"
-    for prefix in _NORMALISE_PREFIXES:
-        if s.startswith(prefix + " "):
-            s = s[len(prefix) + 1 :]
+    # Collapse whitespace BEFORE prefix matching: substitutions above can leave
+    # double spaces (e.g. ordinal "42nd" stripped from the middle), which would
+    # break startswith() against a single-space prefix.
+    s = _WHITESPACE_RE.sub(" ", s).strip()
+    # Strip every matching prefix, restarting from the top of the list each
+    # time so a later strip can expose an earlier prefix (e.g. "ieee" strips
+    # first, then "international conference on" becomes the new leading run).
+    while True:
+        matched = False
+        for prefix in _NORMALISE_PREFIXES:
+            if s.startswith(prefix + " "):
+                s = s[len(prefix) + 1 :]
+                matched = True
+                break
+        if not matched:
             break
-    s = _WHITESPACE_RE.sub(" ", s).strip(" ,.;:-")
-    return s
+    return s.strip(" ,.;:-")
+
+
+def extract_acronym(venue: str | None) -> str:
+    """Pull a likely acronym out of a parenthetical, e.g. "...(ICSE)" -> "icse".
+
+    Filters out long parentheticals like "(was ESEC/FSE, changed 2024)" — only
+    accepts short, space-free candidates with at least one uppercase letter.
+    """
+    if not venue or not isinstance(venue, str):
+        return ""
+    for raw in _PARENS_CAPTURE_RE.findall(venue):
+        candidate = _TRAILING_DIGITS_RE.sub("", raw).strip()
+        if (
+            2 <= len(candidate) <= 12
+            and " " not in candidate
+            and any(c.isupper() for c in candidate)
+        ):
+            return candidate.lower()
+    return ""
 
 
 def load_raw_papers() -> list[dict]:
@@ -188,7 +221,12 @@ def main() -> None:
             "https://portal.core.edu.au/conf-ranks/ into data/raw/ first."
         )
     df["normalised_venue"] = df["venue"].apply(normalise)
+    df["_acronym"] = df["venue"].apply(extract_acronym)
     df["core_rank"] = df["normalised_venue"].map(core_lookup)
+    # Fall back to the parenthetical acronym when the title-derived key missed.
+    acronym_rank = df["_acronym"].map(core_lookup)
+    df["core_rank"] = df["core_rank"].fillna(acronym_rank)
+    df = df.drop(columns=["_acronym"])
     df = df[df["core_rank"].isin(KEPT_RANKS)]
     print(f"  After:  {len(df)}")
 
