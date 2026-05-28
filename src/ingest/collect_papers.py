@@ -6,13 +6,14 @@ checkpoint files so partial progress survives restarts.
 
 Run from anywhere:
     python src/ingest/collect_papers.py
+
+Cleaning, dedup, and CORE filtering live in `clean_corpus.py`.
 """
 
 import json
 import time
 from pathlib import Path
 
-import pandas as pd
 import requests
 from tenacity import (
     RetryError,
@@ -36,10 +37,9 @@ FIELDS = "paperId,title,abstract,year,venue"
 USER_AGENT = "se-paper-type-classifier/0.1 (mailto:maung.w@northeastern.edu)"
 REQUEST_TIMEOUT = 60
 POLITE_DELAY_SEC = 5
-  
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RAW_DIR = REPO_ROOT / "data" / "raw" / "semantic_scholar"
-CORPUS_PATH = REPO_ROOT / "data" / "raw" / "technical_debt_corpus.csv"
 
 
 class RateLimited(Exception):
@@ -120,33 +120,10 @@ def load_or_fetch(query: str) -> list[dict]:
 
 def main() -> None:
     RAW_DIR.mkdir(parents=True, exist_ok=True)
-    all_papers: list[dict] = []
-    seen_ids: set[str] = set()
-
     for query in QUERIES:
-        papers = load_or_fetch(query)
-        for paper in papers:
-            pid = paper.get("paperId")
-            if pid and pid not in seen_ids:
-                seen_ids.add(pid)
-                all_papers.append(paper)
+        load_or_fetch(query)
         time.sleep(POLITE_DELAY_SEC)
-
-    rows = [
-        {
-            "paper_id": p.get("paperId", ""),
-            "title": p.get("title", ""),
-            "abstract": p.get("abstract", ""),
-            "year": p.get("year", ""),
-            "venue": p.get("venue", ""),
-        }
-        for p in all_papers
-    ]
-    df = pd.DataFrame(rows)
-    df = df[df["abstract"].notna() & (df["abstract"].str.len() > 100)]
-    df = df.drop_duplicates(subset=["paper_id"])
-    df.to_csv(CORPUS_PATH, index=False)
-    print(f"Done! Saved {len(df)} papers to {CORPUS_PATH}")
+    print(f"Done. Cached {len(QUERIES)} query results in {RAW_DIR}")
 
 
 if __name__ == "__main__":
