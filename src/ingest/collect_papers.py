@@ -35,6 +35,16 @@ QUERIES = [
     "requirements debt",
     "infrastructure debt",
     "build debt",
+    "ML technical debt",
+    "machine learning technical debt",
+    "data debt",
+    "process debt",
+    "social debt",
+    "people debt",
+    "test smell",
+    "architecture erosion",
+    "software erosion",
+    "techdebt",
 ]
 
 # The bulk endpoint returns up to 1000 results per call, making it more
