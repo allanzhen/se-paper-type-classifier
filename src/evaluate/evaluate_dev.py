@@ -15,20 +15,25 @@ from pathlib import Path
 
 import pandas as pd
 
+# Extend sys.path so we can import from sibling source directories without
+# restructuring the package layout. E402 is suppressed on the imports below
+# because they must follow this path manipulation.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src" / "classify"))
 sys.path.insert(0, str(REPO_ROOT / "src" / "evaluate"))
 
-from rule_classifier import classify as rule_classify  # noqa: E402
-from zero_shot import classify_papers as zs_classify_papers  # noqa: E402
-from hybrid import combine as hybrid_combine  # noqa: E402
-from evaluate_zero_shot import normalise_gold  # noqa: E402
+from rule_classifier import classify as rule_classify          # noqa: E402
+from zero_shot import classify_papers as zs_classify_papers    # noqa: E402
+from hybrid import combine as hybrid_combine                   # noqa: E402
+from evaluate_zero_shot import normalise_gold                  # noqa: E402  — reuse the same label normaliser
 
-DEV_PATH = REPO_ROOT / "data" / "gold" / "dev_set_labeled.csv"
-OUTPUT_PATH = REPO_ROOT / "data" / "processed" / "dev_eval.csv"
+DEV_PATH    = REPO_ROOT / "data" / "gold" / "dev_set_labeled.csv"   # user-filled template
+OUTPUT_PATH = REPO_ROOT / "data" / "processed" / "dev_eval.csv"     # detailed per-paper results
 
 
 def main() -> None:
+    # ── Input validation ──────────────────────────────────────────────────────
+    # Fail with a clear instruction rather than a pandas FileNotFoundError.
     if not DEV_PATH.exists():
         raise SystemExit(
             f"{DEV_PATH.name} not found. Label dev_set_template.csv and "
@@ -36,9 +41,12 @@ def main() -> None:
         )
 
     dev = pd.read_csv(DEV_PATH)
+
+    # The classification column must exist — it's the user's manual labels.
     if "classification" not in dev.columns:
         raise SystemExit("Expected 'classification' column in dev set.")
 
+    # Catch partially-filled templates before running the (slow) classifiers.
     blanks = dev["classification"].isna() | (
         dev["classification"].astype(str).str.strip() == ""
     )
@@ -50,18 +58,23 @@ def main() -> None:
 
     print(f"Dev set: {len(dev)} papers")
 
-    # The labelling template included `zs_predicted` and `rule_predicted`
-    # as hints. Drop them so our fresh classifier outputs don't collide
-    # with these stale columns when we merge / assign below.
+    # The labelling template included `zs_predicted` and `rule_predicted` as
+    # annotator hints. Drop them now so the fresh classifier outputs we're
+    # about to generate don't collide with these stale hint columns when we
+    # merge / assign them below.
     dev = dev.drop(
         columns=[c for c in ("zs_predicted", "rule_predicted") if c in dev.columns]
     )
 
+    # Normalise manual labels to the same canonical strings the classifiers
+    # emit so equality checks in `*_correct` columns are valid.
     dev["gold_label"] = dev["classification"].map(normalise_gold)
 
-    # Drop "Other / Unclassifiable" before metrics. These are dev papers the
-    # labeller couldn't fit into the 8-class taxonomy from title+abstract
-    # alone; they're documented as a methodology limitation, not evaluated.
+    # ── Exclude unclassifiable papers ─────────────────────────────────────────
+    # Some dev papers couldn't be assigned to any of the 9 classes from
+    # title + abstract alone. These are documented as a methodology limitation
+    # and excluded from accuracy metrics — penalising the classifier for them
+    # would be unfair, but we still report how many there are.
     unclassifiable = dev["gold_label"] == "Other / Unclassifiable"
     n_unclass = int(unclassifiable.sum())
     if n_unclass:
@@ -72,32 +85,40 @@ def main() -> None:
         )
         dev = dev[~unclassifiable].reset_index(drop=True)
 
-    # Rule classifier
+    # ── Rule classifier ───────────────────────────────────────────────────────
+    # Called row-by-row because rule_classify() operates on a single (title,
+    # abstract) pair. NaN guards prevent string operations on missing fields.
     rule_labels, rule_confs = [], []
     for _, row in dev.iterrows():
-        title = "" if pd.isna(row.get("title")) else str(row["title"])
+        title    = "" if pd.isna(row.get("title"))    else str(row["title"])
         abstract = "" if pd.isna(row.get("abstract")) else str(row["abstract"])
-        label, conf, _, _ = rule_classify(title, abstract)
+        label, conf, _, _ = rule_classify(title, abstract)  # returns (label, confidence, matched_rules, evidence)
         rule_labels.append(label)
         rule_confs.append(round(conf, 3))
-    dev["rule_predicted"] = rule_labels
+    dev["rule_predicted"]  = rule_labels
     dev["rule_confidence"] = rule_confs
 
-    # Zero-shot classifier
-    zs_input = dev[["paper_id", "title", "abstract"]].copy()
+    # ── Zero-shot classifier ──────────────────────────────────────────────────
+    # classify_papers() is vectorised — pass the whole DataFrame at once for
+    # efficiency. We then merge the predictions back onto dev by paper_id so
+    # the row order is guaranteed to align even if classify_papers() reorders.
+    zs_input  = dev[["paper_id", "title", "abstract"]].copy()
     zs_result = zs_classify_papers(zs_input)
     dev = dev.merge(
         zs_result[["paper_id", "predicted_type_zs", "confidence_zs"]],
         on="paper_id",
-        how="left",
+        how="left",   # left join preserves all dev rows even if a paper_id is missing from zs_result
     ).rename(
         columns={
             "predicted_type_zs": "zs_predicted",
-            "confidence_zs": "zs_confidence",
+            "confidence_zs":     "zs_confidence",
         }
     )
 
-    # Hybrid orchestration: use rule when it fires (non-Unknown), else zero-shot.
+    # ── Hybrid classifier ─────────────────────────────────────────────────────
+    # hybrid_combine() selects between rule and zero-shot predictions using the
+    # confidence scores from each. The returned tuple is (label, confidence, method)
+    # where method is "rule" or "zero-shot" so we can audit which source won.
     hybrid_results = [
         hybrid_combine(rp, rc, zp, zc)
         for rp, rc, zp, zc in zip(
@@ -107,14 +128,18 @@ def main() -> None:
             dev["zs_confidence"],
         )
     ]
-    dev["hybrid_predicted"] = [r[0] for r in hybrid_results]
+    dev["hybrid_predicted"]  = [r[0] for r in hybrid_results]
     dev["hybrid_confidence"] = [r[1] for r in hybrid_results]
-    dev["hybrid_method"] = [r[2] for r in hybrid_results]
+    dev["hybrid_method"]     = [r[2] for r in hybrid_results]  # "rule" or "zero-shot"
 
-    dev["rule_correct"] = dev["rule_predicted"] == dev["gold_label"]
-    dev["zs_correct"] = dev["zs_predicted"] == dev["gold_label"]
+    # ── Correctness flags ─────────────────────────────────────────────────────
+    # Simple boolean columns — True when predicted label exactly matches the
+    # normalised gold label. Used both for overall accuracy and per-class tables.
+    dev["rule_correct"]   = dev["rule_predicted"]   == dev["gold_label"]
+    dev["zs_correct"]     = dev["zs_predicted"]     == dev["gold_label"]
     dev["hybrid_correct"] = dev["hybrid_predicted"] == dev["gold_label"]
 
+    # ── Write output ──────────────────────────────────────────────────────────
     out = dev[
         [
             "paper_id",
@@ -128,7 +153,7 @@ def main() -> None:
             "zs_correct",
             "hybrid_predicted",
             "hybrid_confidence",
-            "hybrid_method",
+            "hybrid_method",    # tracks which classifier the hybrid chose for each paper
             "hybrid_correct",
         ]
     ]
@@ -136,6 +161,7 @@ def main() -> None:
     out.to_csv(OUTPUT_PATH, index=False)
     print(f"\nWrote {len(out)} evaluated papers to {OUTPUT_PATH}")
 
+    # ── Overall accuracy summary ──────────────────────────────────────────────
     n = len(out)
     print(
         f"\nRule accuracy:      {int(out['rule_correct'].sum())}/{n} = "
@@ -149,43 +175,44 @@ def main() -> None:
         f"Hybrid accuracy:    {int(out['hybrid_correct'].sum())}/{n} = "
         f"{100 * out['hybrid_correct'].mean():.1f}%"
     )
+    # Show how often the hybrid deferred to each sub-classifier — a useful
+    # sanity check that the rule classifier is firing at the expected rate.
     print(
         f"  (hybrid used rule for {(out['hybrid_method']=='rule').sum()}/{n}, "
         f"zero-shot for {(out['hybrid_method']=='zero-shot').sum()}/{n})"
     )
 
+    # ── Per-class accuracy ────────────────────────────────────────────────────
+    # Shows all three classifiers side-by-side so you can see which classes
+    # benefit from the hybrid (rule improves) vs. hurt it (zero-shot better).
+    # Sorted by count so the most frequent classes appear first.
     print("\nPer-class accuracy:")
     per_class = out.groupby("gold_label").agg(
-        count=("gold_label", "size"),
-        rule_correct=("rule_correct", "sum"),
-        zs_correct=("zs_correct", "sum"),
-        hybrid_correct=("hybrid_correct", "sum"),
+        count          =("gold_label",     "size"),
+        rule_correct   =("rule_correct",   "sum"),
+        zs_correct     =("zs_correct",     "sum"),
+        hybrid_correct =("hybrid_correct", "sum"),
     )
-    per_class["rule_pct"] = (
-        per_class["rule_correct"] / per_class["count"] * 100
-    ).round(1)
-    per_class["zs_pct"] = (
-        per_class["zs_correct"] / per_class["count"] * 100
-    ).round(1)
-    per_class["hybrid_pct"] = (
-        per_class["hybrid_correct"] / per_class["count"] * 100
-    ).round(1)
+    per_class["rule_pct"]   = (per_class["rule_correct"]   / per_class["count"] * 100).round(1)
+    per_class["zs_pct"]     = (per_class["zs_correct"]     / per_class["count"] * 100).round(1)
+    per_class["hybrid_pct"] = (per_class["hybrid_correct"] / per_class["count"] * 100).round(1)
     print(
         per_class[
             [
                 "count",
-                "rule_correct",
-                "rule_pct",
-                "zs_correct",
-                "zs_pct",
-                "hybrid_correct",
-                "hybrid_pct",
+                "rule_correct",  "rule_pct",
+                "zs_correct",    "zs_pct",
+                "hybrid_correct","hybrid_pct",
             ]
         ]
         .sort_values("count", ascending=False)
         .to_string()
     )
 
+    # ── Confusion matrices ────────────────────────────────────────────────────
+    # One matrix per classifier. Rows = true gold label, columns = predicted
+    # label. Off-diagonal cells reveal the specific class pairs that are being
+    # confused, which guides targeted rule or prompt improvements.
     print("\nRule confusion matrix (rows=gold, cols=rule_predicted):")
     print(pd.crosstab(out["gold_label"], out["rule_predicted"]).to_string())
 
