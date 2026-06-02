@@ -57,6 +57,11 @@ RULES: dict[str, list[str]] = {
         r"\bour tool\b",
         r"\bthe tool (?:supports?|allows?|enables?|provides?|is)\b",
         r"\bopen[- ]source tool\b",
+        # A named tool described by purpose, e.g. "a smell detection tool for
+        # ...". TD tool papers rarely say "we present a tool" but routinely
+        # phrase it this way; validated as high-precision on the dev set.
+        r"\b(?:a |the |our )?tool (?:for|to|that|which|supports?|called)\b",
+        r"\b(?:detection|analysis|visuali[sz]ation|monitoring|recommendation) tool\b",
         r"\b(?:eclipse|intellij|vs ?code) plug[- ]?in\b",
         r"\bide plug[- ]?in\b",
         r"\b(?:github|gitlab)\.com/\S+",
