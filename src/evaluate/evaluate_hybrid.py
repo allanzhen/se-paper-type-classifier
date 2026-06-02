@@ -24,14 +24,11 @@ predictions + confidences, which method the hybrid used, and per-classifier
 hybrid and the hybrid confusion matrix.
 """
 
-import sys
 from pathlib import Path
 
 import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT / "src" / "evaluate"))
-from evaluate_zero_shot import normalise_gold  # noqa: E402
 
 GOLD_PATH = REPO_ROOT / "data" / "gold" / "gold_standard_papers.csv"
 RULE_PRED_PATH = REPO_ROOT / "data" / "processed" / "corpus_labeled.csv"
@@ -105,8 +102,7 @@ def main() -> None:
             "gold paper."
         )
 
-    result["gold_label_raw"] = result["manual_label"]
-    result["gold_label"] = result["manual_label"].map(normalise_gold)
+    result["gold_label"] = result["manual_label"]
 
     hybrid = [
         combine(rp, rc, zp, zc)
@@ -128,7 +124,6 @@ def main() -> None:
     out = result[[
         "paper_id",
         "title",
-        "gold_label_raw",
         "gold_label",
         "rule_predicted",
         "rule_confidence",

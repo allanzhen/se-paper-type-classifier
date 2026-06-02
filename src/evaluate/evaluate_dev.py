@@ -25,7 +25,41 @@ sys.path.insert(0, str(REPO_ROOT / "src" / "evaluate"))
 from rule_classifier import classify as rule_classify          # noqa: E402
 from zero_shot import classify_papers as zs_classify_papers    # noqa: E402
 from hybrid import combine as hybrid_combine                   # noqa: E402
-from evaluate_zero_shot import normalise_gold                  # noqa: E402  — reuse the same label normaliser
+
+# The dev set's `classification` column is hand-filled and still contains
+# abbreviations ("SLR") and compound/extra categories ("Secondary Study",
+# "Other / Unclassifiable", "Experience Report / Case Study"). Unlike the
+# gold file -- whose labels are now standardized at the source -- the dev set
+# still needs normalisation, so the map lives here with its only consumer.
+GOLD_NORMALISE: dict[str, str] = {
+    "empirical study":              "Empirical Study",
+    "emperical study":              "Empirical Study",
+    "emprical study":               "Empirical Study",
+    "controlled experiment":        "Controlled Experiment",
+    "slr":                          "Systematic Literature Review",
+    "systematic literature review": "Systematic Literature Review",
+    "survey":                       "Survey",
+    "tool paper":                   "Tool Paper",
+    "tool":                         "Tool Paper",
+    "experience report":            "Experience Report",
+    "case study":                   "Case Study",
+    "position paper":               "Position Paper",
+    "theoretical contribution":     "Theoretical Contribution",
+    "theortical contribution":      "Theoretical Contribution",
+    "theoritical contribution":     "Theoretical Contribution",
+}
+
+
+def normalise_gold(label: str) -> str:
+    """Map a raw dev label to its canonical classifier label.
+
+    Falls back to the stripped original so unlisted variants (e.g.
+    "Secondary Study") surface visibly rather than silently becoming empty.
+    """
+    if not isinstance(label, str):
+        return ""
+    return GOLD_NORMALISE.get(label.strip().lower(), label.strip())
+
 
 DEV_PATH    = REPO_ROOT / "data" / "gold" / "dev_set_labeled.csv"   # user-filled template
 OUTPUT_PATH = REPO_ROOT / "data" / "processed" / "dev_eval.csv"     # detailed per-paper results
