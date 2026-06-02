@@ -50,8 +50,8 @@ HYPOTHESIS_TEMPLATE = "This paper is {}."
 # An earlier negation-heavy rewrite measured ~2% worse and was reverted here.
 LABELS: dict[str, str] = {
     "Empirical Study": (
-        "an empirical study that observes, mines, or measures real-world "
-        "software, data, or developers to answer a research question"
+        "an empirical study that analyzes data mined or measured from real "
+        "software systems, repositories, or projects to answer a research question"
     ),
     "Controlled Experiment": (
         "a controlled experiment with human participants randomly assigned "
@@ -62,8 +62,8 @@ LABELS: dict[str, str] = {
         "inclusion and exclusion criteria, and a reproducible protocol"
     ),
     "Survey": (
-        "a literature survey summarizing prior work on a topic, or a "
-        "questionnaire or interview study of software practitioners"
+        "a broad survey of the state of the art on a topic, or a questionnaire "
+        "surveying the opinions and experiences of software practitioners"
     ),
     "Tool Paper": (
         "a paper that presents a new software tool, automated technique, or "
@@ -83,8 +83,8 @@ LABELS: dict[str, str] = {
         "future research direction"
     ),
     "Theoretical Contribution": (
-        "a paper that proposes a new taxonomy, conceptual model or framework, "
-        "metric, or formal theory for software engineering as its central deliverable"
+        "a paper whose main contribution is a new conceptual model, taxonomy, "
+        "metric, or theoretical framework that explains or structures a phenomenon"
     ),
 }
 
