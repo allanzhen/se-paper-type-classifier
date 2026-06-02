@@ -44,8 +44,11 @@ HYPOTHESIS_TEMPLATE = "This paper is {}."
 # names are stable identifiers used everywhere else in the pipeline.
 LABELS: dict[str, str] = {
     "Empirical Study": (
-        "an empirical study that observes, mines, or measures real-world "
-        "software, data, or developers to answer a research question"
+        "an observational or measurement study that collects and analyzes data "
+        "from real-world software systems, repositories, or developers to answer "
+        "a research question — it does not introduce a new tool, follow a "
+        "systematic literature search protocol, recruit participants for a "
+        "controlled experiment, or report practitioner lessons from a specific organization"
     ),
     "Controlled Experiment": (
         "a controlled experiment with human participants randomly assigned "
@@ -56,28 +59,39 @@ LABELS: dict[str, str] = {
         "inclusion and exclusion criteria, and a reproducible protocol"
     ),
     "Survey": (
-        "a literature survey summarizing prior work on a topic, or a "
-        "questionnaire or interview study of software practitioners"
+        "a questionnaire or interview study that collects opinions, perceptions, "
+        "or attitudes from software practitioners, OR a narrative literature "
+        "overview that summarizes prior work without a formal systematic search "
+        "protocol, inclusion criteria, or reproducibility requirement"
     ),
     "Tool Paper": (
-        "a paper that introduces a new named software tool and describes its "
-        "features, design, and how developers can use it"
+        "a paper whose central contribution is a new software tool, plugin, "
+        "IDE extension, or automated system — the paper describes the tool's "
+        "design, architecture, and usage, with any empirical evaluation being "
+        "secondary to the tool introduction itself"
     ),
     "Experience Report": (
-        "an experience report describing the practical application of a "
-        "technique, process, or tool in a real organization, with lessons learned"
+        "a practitioner experience report describing first-hand industrial "
+        "experience adopting or applying a technique, process, or tool in a "
+        "specific real organization — the contribution is practical lessons "
+        "learned, not a controlled study, formal evaluation, or new tool"
     ),
     "Case Study": (
-        "an in-depth case study of a specific organization, project, or team, "
-        "using multiple sources of evidence such as interviews and documents"
+        "an in-depth qualitative or mixed-methods case study of one or more "
+        "specific software projects, teams, or organizations — it triangulates "
+        "multiple sources of evidence such as interviews, observations, and "
+        "documents to understand a phenomenon in its real-world context"
     ),
     "Position Paper": (
         "a position or vision paper arguing for a particular viewpoint or "
         "future research direction"
     ),
     "Theoretical Contribution": (
-        "a paper that proposes a new taxonomy, conceptual framework, or formal "
-        "theory of software engineering as its central deliverable"
+        "a paper whose sole primary contribution is a new taxonomy, "
+        "classification scheme, conceptual model, ontology, or formal "
+        "theoretical framework — the paper develops the theory itself rather "
+        "than collecting empirical data from systems, building a tool, or "
+        "reviewing literature"
     ),
 }
 
