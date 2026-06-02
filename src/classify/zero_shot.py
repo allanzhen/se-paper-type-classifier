@@ -42,13 +42,16 @@ HYPOTHESIS_TEMPLATE = "This paper is {}."
 # wording directly controls classification accuracy. Tune the expanded phrases
 # (not the short names) to shift accuracy on ambiguous classes; the short
 # names are stable identifiers used everywhere else in the pipeline.
+#
+# NOTE on wording style: keep each phrase SHORT, POSITIVE, and crisp. NLI
+# zero-shot scores whether the abstract entails the *whole* hypothesis, so long
+# compound phrases dilute the signal and negation ("does not introduce a tool")
+# tends to backfire -- the model keys on the negated noun and scores it higher.
+# An earlier negation-heavy rewrite measured ~2% worse and was reverted here.
 LABELS: dict[str, str] = {
     "Empirical Study": (
-        "an observational or measurement study that collects and analyzes data "
-        "from real-world software systems, repositories, or developers to answer "
-        "a research question — it does not introduce a new tool, follow a "
-        "systematic literature search protocol, recruit participants for a "
-        "controlled experiment, or report practitioner lessons from a specific organization"
+        "an empirical study that observes, mines, or measures real-world "
+        "software, data, or developers to answer a research question"
     ),
     "Controlled Experiment": (
         "a controlled experiment with human participants randomly assigned "
@@ -59,39 +62,29 @@ LABELS: dict[str, str] = {
         "inclusion and exclusion criteria, and a reproducible protocol"
     ),
     "Survey": (
-        "a questionnaire or interview study that collects opinions, perceptions, "
-        "or attitudes from software practitioners, OR a narrative literature "
-        "overview that summarizes prior work without a formal systematic search "
-        "protocol, inclusion criteria, or reproducibility requirement"
+        "a literature survey summarizing prior work on a topic, or a "
+        "questionnaire or interview study of software practitioners"
     ),
     "Tool Paper": (
-        "a paper whose central contribution is a new software tool, plugin, "
-        "IDE extension, or automated system — the paper describes the tool's "
-        "design, architecture, and usage, with any empirical evaluation being "
-        "secondary to the tool introduction itself"
+        "a paper that presents a new software tool, automated technique, or "
+        "system as its central contribution, describing what it does, how it "
+        "is implemented, and how it is applied"
     ),
     "Experience Report": (
-        "a practitioner experience report describing first-hand industrial "
-        "experience adopting or applying a technique, process, or tool in a "
-        "specific real organization — the contribution is practical lessons "
-        "learned, not a controlled study, formal evaluation, or new tool"
+        "an experience report describing the practical application of a "
+        "technique, process, or tool in a real organization, with lessons learned"
     ),
     "Case Study": (
-        "an in-depth qualitative or mixed-methods case study of one or more "
-        "specific software projects, teams, or organizations — it triangulates "
-        "multiple sources of evidence such as interviews, observations, and "
-        "documents to understand a phenomenon in its real-world context"
+        "an in-depth case study of a specific organization, project, or team, "
+        "using multiple sources of evidence such as interviews and documents"
     ),
     "Position Paper": (
         "a position or vision paper arguing for a particular viewpoint or "
         "future research direction"
     ),
     "Theoretical Contribution": (
-        "a paper whose sole primary contribution is a new taxonomy, "
-        "classification scheme, conceptual model, ontology, or formal "
-        "theoretical framework — the paper develops the theory itself rather "
-        "than collecting empirical data from systems, building a tool, or "
-        "reviewing literature"
+        "a paper that proposes a new taxonomy, conceptual framework, or formal "
+        "theory of software engineering as its central deliverable"
     ),
 }
 
