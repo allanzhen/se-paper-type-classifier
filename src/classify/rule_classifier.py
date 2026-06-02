@@ -21,41 +21,65 @@ from pathlib import Path
 
 import pandas as pd
 
+# Add the classify directory to sys.path so rules.py can be imported as a
+# sibling module without restructuring the package layout.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from rules import COMPILED  # noqa: E402
+from rules import COMPILED  # noqa: E402  — import must follow sys.path insert
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-INPUT_PATH = REPO_ROOT / "data" / "processed" / "corpus.csv"
-OUTPUT_PATH = REPO_ROOT / "data" / "processed" / "corpus_labeled.csv"
+REPO_ROOT   = Path(__file__).resolve().parents[2]
+INPUT_PATH  = REPO_ROOT / "data" / "processed" / "corpus.csv"         # cleaned corpus
+OUTPUT_PATH = REPO_ROOT / "data" / "processed" / "corpus_labeled.csv" # corpus with rule predictions appended
 
 
 def classify(title: str, abstract: str) -> tuple[str, float, str, list[str]]:
-    """Classify one paper.
+    """Classify one paper using keyword/phrase match counts.
 
-    Returns (label, confidence, unknown_reason, matched_patterns).
-    unknown_reason is "" for labeled papers, "no_match" when nothing fired,
-    or "tie:LabelA|LabelB[|...]" when the top score was shared.
+    Concatenates title and abstract, then counts how many compiled regex
+    patterns from rules.py match for each label. The label with the most
+    matches wins. Returns a 4-tuple:
+        label           -- winning class label, or "Unknown"
+        confidence      -- top_score / (top_score + second_score); 0.0 for Unknown
+        unknown_reason  -- "" if labeled, "no_match" if nothing fired,
+                           "tie:LabelA|LabelB" if top score was shared
+        matched_patterns -- list of pattern strings that fired for the winner
+                            (union of all tied labels when tied)
     """
+    # Newline separator gives the model a natural boundary between title and
+    # abstract so a pattern can't accidentally straddle both fields.
     text = f"{title}\n{abstract}"
-    scores: dict[str, int] = {}
-    matches: dict[str, list[str]] = {}
+
+    scores: dict[str, int]         = {}  # total match count per label
+    matches: dict[str, list[str]]  = {}  # pattern strings that fired, per label
+
+    # COMPILED is {label: [compiled_regex, ...]} from rules.py.
+    # Each pattern that matches anywhere in the text counts as one vote for
+    # that label — the classifier is a simple majority-vote over regex hits.
     for label, patterns in COMPILED.items():
         hits = [p.pattern for p in patterns if p.search(text)]
-        scores[label] = len(hits)
-        matches[label] = hits
+        scores[label]  = len(hits)   # vote count
+        matches[label] = hits        # keep the pattern strings for the matched_rules column
 
+    # Sort labels by vote count descending so ranked[0] is always the top candidate.
     ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
-    top_label, top_score = ranked[0]
+    top_label, top_score   = ranked[0]
     second_score = ranked[1][1] if len(ranked) > 1 else 0
 
+    # No rule fired at all — paper is too ambiguous or outside the taxonomy.
     if top_score == 0:
         return "Unknown", 0.0, "no_match", []
 
+    # Two or more labels tied — a winner can't be chosen without a tiebreaker,
+    # so we surface this as Unknown with a diagnostic reason string.
     if top_score == second_score:
-        tied = [label for label, score in ranked if score == top_score]
+        tied  = [label for label, score in ranked if score == top_score]
+        # Report the union of all matched patterns across tied labels so the
+        # reason string is useful for debugging which rules are conflicting.
         union = sorted({h for label in tied for h in matches[label]})
         return "Unknown", 0.0, "tie:" + "|".join(tied), union
 
+    # Confidence is the fraction of total top-two votes that the winner holds.
+    # A clear winner with no second-place matches scores 1.0; a narrow win
+    # (e.g. 2 vs 1) scores ~0.67. This stays in [0, 1] without needing softmax.
     confidence = top_score / (top_score + second_score)
     return top_label, confidence, "", matches[top_label]
 
@@ -64,34 +88,45 @@ def main() -> None:
     df = pd.read_csv(INPUT_PATH)
     print(f"Loaded {len(df)} papers from {INPUT_PATH.name}")
 
+    # Parallel lists — one entry per row, appended in order so alignment with
+    # df is guaranteed without needing a merge step at the end.
     labels, confs, reasons, hit_lists = [], [], [], []
+
     for _, row in df.iterrows():
-        title = "" if pd.isna(row.get("title")) else str(row["title"])
+        # Guard against NaN fields before passing to classify().
+        title    = "" if pd.isna(row.get("title"))    else str(row["title"])
         abstract = "" if pd.isna(row.get("abstract")) else str(row["abstract"])
         label, conf, reason, hits = classify(title, abstract)
         labels.append(label)
         confs.append(round(conf, 3))
         reasons.append(reason)
+        # Join matched patterns into a single string so they survive CSV serialisation.
         hit_lists.append("; ".join(hits))
 
-    df["predicted_type"] = labels
-    df["confidence"] = confs
-    df["unknown_reason"] = reasons
-    df["matched_rules"] = hit_lists
+    df["predicted_type"]  = labels
+    df["confidence"]      = confs
+    df["unknown_reason"]  = reasons
+    df["matched_rules"]   = hit_lists   # semicolon-separated; split on "; " to recover the list
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUTPUT_PATH, index=False)
     print(f"Wrote {len(df)} labeled papers to {OUTPUT_PATH}")
 
+    # ── Diagnostics ───────────────────────────────────────────────────────────
     print("\nPredicted-type distribution:")
     print(df["predicted_type"].value_counts().to_string())
 
+    # Break down Unknown papers by reason so it's easy to distinguish
+    # "no rules fired at all" (no_match) from "rules conflicted" (tie:...).
     unknown = df[df["predicted_type"] == "Unknown"]
     if len(unknown):
         print(f"\nUnknown breakdown ({len(unknown)} papers):")
         # Bucket ties by their full reason ("tie:A|B") for visibility.
         print(unknown["unknown_reason"].value_counts().to_string())
 
+    # Coverage and mean confidence on the papers that were successfully labeled.
+    # Low coverage suggests the rules are too narrow; low confidence suggests
+    # many near-ties that could be resolved by adding stronger patterns.
     labeled = df[df["predicted_type"] != "Unknown"]
     if len(labeled):
         print(
