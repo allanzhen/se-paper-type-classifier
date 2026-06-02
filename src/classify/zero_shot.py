@@ -83,8 +83,8 @@ LABELS: dict[str, str] = {
         "future research direction"
     ),
     "Theoretical Contribution": (
-        "a paper that proposes a new taxonomy, conceptual framework, or formal "
-        "theory of software engineering as its central deliverable"
+        "a paper that proposes a new taxonomy, conceptual model or framework, "
+        "metric, or formal theory for software engineering as its central deliverable"
     ),
 }
 
