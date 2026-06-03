@@ -113,6 +113,12 @@ RULES: dict[str, list[str]] = {
         r"\bin our (?:organi[sz]ation|company|team)\b",
         r"\b(?:at|inside) (?:microsoft|google|facebook|meta|amazon|netflix|ibm|abb|ericsson|sap|spotify|uber|airbnb)\b",
         r"\bpractitioners?[’']? (?:perspective|view|experience)\b",
+        # Provenance cues: a technique/framework/practice applied first-hand in a
+        # specific real organization is an Experience Report even without the
+        # phrase "lessons learned". Validated against the gold Experience Reports.
+        r"\bapplied (?:in|at|within)\b.{0,30}\b(?:organi[sz]ation|compan|unit|team|firm|enterprise|department|division)",
+        r"\bwe (?:present|describe|report)\b.{0,20}\b(?:practice|experience|deployment)\b",
+        r"\bin an? (?:industrial|industry|real[- ]world|production) (?:setting|context|environment)\b",
     ],
     "Position Paper": [
         r"\bposition paper\b",
