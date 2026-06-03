@@ -134,6 +134,30 @@ def classify(title: str, abstract: str) -> tuple[str, float, str, list[str]]:
     if top_score == 0:
         return "Unknown", 0.0, "no_match", []
 
+    # Documented precedence (Tool Paper definition; docs/Paper Type Definitions.md
+    # and the comment on the Tool Paper rules): a newly built artifact that is
+    # ALSO empirically evaluated is a Tool Paper, not an Empirical Study. The flat
+    # vote can't see this — it leaves such papers as a Tool|Empirical tie (->
+    # Unknown -> zero-shot, which is weak on tools) or lets the evaluation cues
+    # win. So when the top of the vote is a Tool-vs-Empirical contest, award it to
+    # Tool Paper. Scoped STRICTLY to Empirical: other contests (e.g.
+    # Tool|Experience Report on "SoHist", Tool|Theoretical on "Combining
+    # Insights") are left alone because those non-Tool labels are often correct.
+    tool_score = scores["Tool Paper"]
+    top_labels = [label for label, score in ranked if score == top_score]
+    if (
+        tool_score > 0
+        and "Empirical Study" in top_labels
+        and set(top_labels) <= {"Tool Paper", "Empirical Study"}
+    ):
+        emp_score = scores["Empirical Study"]
+        return (
+            "Tool Paper",
+            tool_score / (tool_score + emp_score),
+            "",
+            matches["Tool Paper"],
+        )
+
     # Two or more labels tied — a winner can't be chosen without a tiebreaker,
     # so we surface this as Unknown with a diagnostic reason string.
     if top_score == second_score:
