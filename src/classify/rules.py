@@ -69,6 +69,18 @@ RULES: dict[str, list[str]] = {
         r"\bdemonstration\b",
         r"\bprototype (?:tool|implementation)\b",
         r"\bcommand[- ]line tool\b",
+        # A contributed artifact framed as "we propose/present/introduce a
+        # <method|model|dataset|...>". In this corpus the gold taxonomy treats a
+        # paper whose central contribution is a newly built approach/model/dataset
+        # as a Tool Paper, even when it is empirically evaluated. Validated on the
+        # gold set at ~10:1 precision for Tool Paper vs Empirical Study.
+        r"\bwe (?:propose|present|introduce|develop|design|build|implement)\b.{0,45}\b(?:approach|method|methodolog|technique|framework|model|classifier|tool|system|dataset|data set|index|metric|pipeline|algorithm|plug[- ]?in|prototype)\b",
+        # A named measurement artifact, e.g. "an architectural technical debt index".
+        r"\b(?:technical debt|td|architectural\s+\w+) index\b",
+        # A *new/automated* approach/model created to detect/classify/predict/etc.
+        # The novelty/automation cue (novel|new|automated|...) is what keeps this
+        # from firing on empirical studies that merely *use* such techniques.
+        r"\b(?:novel|new|automated|automatic|proposed|a)\s+(?:approach|method|technique|framework|model|classifier|pipeline)\b.{0,45}\b(?:detect|identif|classif|predict|estimat|measur|forecast|recommend|remediat)",
     ],
     "Empirical Study": [
         r"\bempirical study\b",
@@ -122,6 +134,11 @@ RULES: dict[str, list[str]] = {
         r"\bontology\b",
         r"\bwe propose a (?:framework|model|theory|taxonomy)\b",
         r"\bmeta[- ]model\b",
+        r"\bconceptual model\b",
+        r"\b(?:probabilistic|mathematical|analytical|computational) model\b",
+        r"\bmodel(?:ed|led|ing)\b.{0,20}\bprobabilistic",
+        r"\bwe model\b",
+        r"\bwe (?:develop|present|propose|introduce|build)(?:ed)? (?:a |an |the |our )?(?:novel )?(?:conceptual|theoretical|formal|mathematical|probabilistic) model\b",
     ],
 }
 

@@ -24,7 +24,7 @@ sys.path.insert(0, str(REPO_ROOT / "src" / "evaluate"))
 
 from rule_classifier import classify as rule_classify          # noqa: E402
 from zero_shot import classify_papers as zs_classify_papers    # noqa: E402
-from hybrid import combine as hybrid_combine                   # noqa: E402
+from evaluate_hybrid import combine as hybrid_combine          # noqa: E402  — combine() lives in evaluate_hybrid.py
 
 # The dev set's `classification` column is hand-filled and still contains
 # abbreviations ("SLR") and compound/extra categories ("Secondary Study",
