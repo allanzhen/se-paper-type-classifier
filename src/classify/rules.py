@@ -81,6 +81,16 @@ RULES: dict[str, list[str]] = {
         # The novelty/automation cue (novel|new|automated|...) is what keeps this
         # from firing on empirical studies that merely *use* such techniques.
         r"\b(?:novel|new|automated|automatic|proposed|a)\s+(?:approach|method|technique|framework|model|classifier|pipeline)\b.{0,45}\b(?:detect|identif|classif|predict|estimat|measur|forecast|recommend|remediat)",
+        # Reverse-order form: detection/classification task stated before the
+        # contribution ("SATD detection with a novel approach leveraging BERT").
+        r"\b(?:detect\w*|classif\w*|identif\w*).{0,50}(?:novel|new|automated|automatic|proposed)\s+(?:approach|method|technique|framework|model|classifier)\b",
+        # Papers whose central contribution is an automated method (e.g.
+        # "Automatically Identifying Relations Between..."). "automatically" in the
+        # title strongly signals a contributed technique, not a passive study.
+        r"\bautomatically\s+(?:identif|detect|classif|extract|predict)",
+        # Papers contributing a new curated/balanced/augmented dataset as their
+        # primary artifact (e.g. SATDAUG). Dataset contribution = Tool Paper.
+        r"\ba (?:balanced|augmented|annotated|curated|labeled|benchmark) dataset\b",
     ],
     "Empirical Study": [
         r"\bempirical study\b",
@@ -103,6 +113,10 @@ RULES: dict[str, list[str]] = {
         r"\bexploratory case study\b",
         r"\bin[- ]depth case\b",
         r"\bcase company\b",
+        # "Industrial Case Study" in a title is an unambiguous CS signal that
+        # earns a second vote, breaking ties with Empirical Study when the
+        # abstract also contains empirical-sounding language.
+        r"\bindustrial case study\b",
     ],
     "Experience Report": [
         r"\bexperience report\b",

@@ -158,6 +158,24 @@ def classify(title: str, abstract: str) -> tuple[str, float, str, list[str]]:
             matches["Tool Paper"],
         )
 
+    # Case Study beats Empirical Study on a tie. Papers that use case-study
+    # language AND happen to say "empirical study" in their abstract (a common
+    # self-description for industrial case studies) should resolve to Case Study.
+    # Scoped to the exact two-way Case Study|Empirical Study tie only.
+    case_score = scores["Case Study"]
+    if (
+        case_score > 0
+        and "Empirical Study" in top_labels
+        and set(top_labels) <= {"Case Study", "Empirical Study"}
+    ):
+        emp_score = scores["Empirical Study"]
+        return (
+            "Case Study",
+            case_score / (case_score + emp_score),
+            "",
+            matches["Case Study"],
+        )
+
     # Two or more labels tied — a winner can't be chosen without a tiebreaker,
     # so we surface this as Unknown with a diagnostic reason string.
     if top_score == second_score:
