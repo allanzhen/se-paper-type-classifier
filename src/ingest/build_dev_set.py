@@ -74,10 +74,10 @@ def main() -> None:
     # Gold papers have already been manually annotated and are used for final
     # evaluation — they must never appear in the dev set to avoid data leakage.
     before = len(df)
-    df = df[~df["paper_id"].isin(gold_df["ID"])].reset_index(drop=True)
+    df = df[~df["paper_id"].isin(gold_df["paper_id"])].reset_index(drop=True)
     print(f"Excluded {before - len(df)} gold papers; {len(df)} candidates remain")
     # Hard assertion: any leak here would silently bias the evaluation.
-    assert df["paper_id"].isin(gold_df["ID"]).sum() == 0, "Gold paper leaked into pool"
+    assert df["paper_id"].isin(gold_df["paper_id"]).sum() == 0, "Gold paper leaked into pool"
 
     # ── Step 1: Stratified sample by zero-shot prediction ────────────────────
     # Sampling by zero-shot label (rather than rule label) gives class coverage

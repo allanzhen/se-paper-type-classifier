@@ -126,7 +126,7 @@ def main() -> None:
     for _, row in dev.iterrows():
         title    = "" if pd.isna(row.get("title"))    else str(row["title"])
         abstract = "" if pd.isna(row.get("abstract")) else str(row["abstract"])
-        label, conf, _, _ = rule_classify(title, abstract)  # returns (label, confidence, matched_rules, evidence)
+        label, conf, _, _ = rule_classify(title, abstract)  # returns (label, confidence, unknown_reason, matched_patterns)
         rule_labels.append(label)
         rule_confs.append(round(conf, 3))
     dev["rule_predicted"]  = rule_labels
@@ -150,9 +150,10 @@ def main() -> None:
     )
 
     # ── Hybrid classifier ─────────────────────────────────────────────────────
-    # hybrid_combine() selects between rule and zero-shot predictions using the
-    # confidence scores from each. The returned tuple is (label, confidence, method)
-    # where method is "rule" or "zero-shot" so we can audit which source won.
+    # hybrid_combine() is rule-first: it uses the rule label whenever the rule
+    # fires (non-Unknown) and falls back to the zero-shot label otherwise. The
+    # returned tuple is (label, confidence, method) where method is "rule" or
+    # "zero-shot" so we can audit which source won.
     hybrid_results = [
         hybrid_combine(rp, rc, zp, zc)
         for rp, rc, zp, zc in zip(
