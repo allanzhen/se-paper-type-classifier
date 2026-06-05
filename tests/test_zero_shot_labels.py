@@ -1,6 +1,6 @@
 """Structural invariants on the zero-shot label set (src/classify/zero_shot.py).
 
-Guarded import: zero_shot imports torch/transformers at module load. We never
+Guarded import: zero_shot imports torch/transformers at module load. Never
 build the pipeline or run the model here.
 """
 
@@ -10,12 +10,7 @@ pytest.importorskip("torch")
 pytest.importorskip("transformers")
 
 import zero_shot as zs  # noqa: E402
-
-CANONICAL = {
-    "Empirical Study", "Controlled Experiment", "Systematic Literature Review",
-    "Survey", "Tool Paper", "Experience Report", "Case Study", "Position Paper",
-    "Theoretical Contribution",
-}
+from labels import CANONICAL_SET as CANONICAL  # noqa: E402
 
 
 def test_labels_are_the_nine_canonical_with_unique_phrasings():

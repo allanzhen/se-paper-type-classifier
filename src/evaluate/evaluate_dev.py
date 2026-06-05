@@ -1,13 +1,11 @@
-"""Evaluate rule + zero-shot classifiers against the labelled dev set.
+"""
+Evaluate rule + zero-shot classifiers against the labelled dev set.
 
 Reads data/gold/dev_set_labeled.csv (the user-filled version of
 dev_set_template.csv), runs both classifiers on the dev papers, and
-reports per-class accuracy for each. This is the evaluator to run on
-every tuning iteration -- the gold set stays sealed for the final
-single-shot evaluation.
+reports per-class accuracy for each. 
 
-DO NOT run this against gold_standard_papers.csv -- that's reserved for
-the final sealed evaluation.
+DO NOT run this against gold_standard_papers.csv 
 """
 
 import sys
@@ -15,22 +13,22 @@ from pathlib import Path
 
 import pandas as pd
 
-# Extend sys.path so we can import from sibling source directories without
-# restructuring the package layout. E402 is suppressed on the imports below
-# because they must follow this path manipulation.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src" / "classify"))
 sys.path.insert(0, str(REPO_ROOT / "src" / "evaluate"))
 
 from rule_classifier import classify as rule_classify          # noqa: E402
 from zero_shot import classify_papers as zs_classify_papers    # noqa: E402
-from evaluate_hybrid import combine as hybrid_combine          # noqa: E402  — combine() lives in evaluate_hybrid.py
+from evaluate_hybrid import combine as hybrid_combine          # noqa: E402
 
-# The dev set's `classification` column is hand-filled and still contains
+# The dev set's `classification` column is hand-filled and might contain
 # abbreviations ("SLR") and compound/extra categories ("Secondary Study",
 # "Other / Unclassifiable", "Experience Report / Case Study"). Unlike the
-# gold file -- whose labels are now standardized at the source -- the dev set
+# gold file, whose labels are standardized at the source, the dev set
 # still needs normalisation, so the map lives here with its only consumer.
+# This normalisation is a one-time cost to clean up the dev set labels so 
+# easily made typos can be fixed, but any unlisted variants will still cause
+# dev papers to be misclassified by the accuracy checks below
 GOLD_NORMALISE: dict[str, str] = {
     "empirical study":              "Empirical Study",
     "emperical study":              "Empirical Study",
@@ -51,7 +49,8 @@ GOLD_NORMALISE: dict[str, str] = {
 
 
 def normalise_gold(label: str) -> str:
-    """Map a raw dev label to its canonical classifier label.
+    """
+    Map a raw dev label to its canonical classifier label.
 
     Falls back to the stripped original so unlisted variants (e.g.
     "Secondary Study") surface visibly rather than silently becoming empty.
@@ -67,7 +66,6 @@ OUTPUT_PATH = REPO_ROOT / "data" / "processed" / "dev_eval.csv"     # detailed p
 
 def main() -> None:
     # ── Input validation ──────────────────────────────────────────────────────
-    # Fail with a clear instruction rather than a pandas FileNotFoundError.
     if not DEV_PATH.exists():
         raise SystemExit(
             f"{DEV_PATH.name} not found. Label dev_set_template.csv and "
@@ -76,11 +74,10 @@ def main() -> None:
 
     dev = pd.read_csv(DEV_PATH)
 
-    # The classification column must exist — it's the user's manual labels.
     if "classification" not in dev.columns:
         raise SystemExit("Expected 'classification' column in dev set.")
 
-    # Catch partially-filled templates before running the (slow) classifiers.
+    # Catch partially-filled templates before running the classifiers.
     blanks = dev["classification"].isna() | (
         dev["classification"].astype(str).str.strip() == ""
     )
@@ -107,7 +104,7 @@ def main() -> None:
     # ── Exclude unclassifiable papers ─────────────────────────────────────────
     # Some dev papers couldn't be assigned to any of the 9 classes from
     # title + abstract alone. These are documented as a methodology limitation
-    # and excluded from accuracy metrics — penalising the classifier for them
+    # and excluded from accuracy metrics; penalising the classifier for them
     # would be unfair, but we still report how many there are.
     unclassifiable = dev["gold_label"] == "Other / Unclassifiable"
     n_unclass = int(unclassifiable.sum())
@@ -126,14 +123,14 @@ def main() -> None:
     for _, row in dev.iterrows():
         title    = "" if pd.isna(row.get("title"))    else str(row["title"])
         abstract = "" if pd.isna(row.get("abstract")) else str(row["abstract"])
-        label, conf, _, _ = rule_classify(title, abstract)  # returns (label, confidence, unknown_reason, matched_patterns)
+        label, conf, _, _ = rule_classify(title, abstract)
         rule_labels.append(label)
         rule_confs.append(round(conf, 3))
     dev["rule_predicted"]  = rule_labels
     dev["rule_confidence"] = rule_confs
 
     # ── Zero-shot classifier ──────────────────────────────────────────────────
-    # classify_papers() is vectorised — pass the whole DataFrame at once for
+    # classify_papers() is vectorised, so pass the whole DataFrame at once for
     # efficiency. We then merge the predictions back onto dev by paper_id so
     # the row order is guaranteed to align even if classify_papers() reorders.
     zs_input  = dev[["paper_id", "title", "abstract"]].copy()
@@ -168,8 +165,6 @@ def main() -> None:
     dev["hybrid_method"]     = [r[2] for r in hybrid_results]  # "rule" or "zero-shot"
 
     # ── Correctness flags ─────────────────────────────────────────────────────
-    # Simple boolean columns — True when predicted label exactly matches the
-    # normalised gold label. Used both for overall accuracy and per-class tables.
     dev["rule_correct"]   = dev["rule_predicted"]   == dev["gold_label"]
     dev["zs_correct"]     = dev["zs_predicted"]     == dev["gold_label"]
     dev["hybrid_correct"] = dev["hybrid_predicted"] == dev["gold_label"]
@@ -188,7 +183,7 @@ def main() -> None:
             "zs_correct",
             "hybrid_predicted",
             "hybrid_confidence",
-            "hybrid_method",    # tracks which classifier the hybrid chose for each paper
+            "hybrid_method",
             "hybrid_correct",
         ]
     ]
@@ -210,8 +205,7 @@ def main() -> None:
         f"Hybrid accuracy:    {int(out['hybrid_correct'].sum())}/{n} = "
         f"{100 * out['hybrid_correct'].mean():.1f}%"
     )
-    # Show how often the hybrid deferred to each sub-classifier — a useful
-    # sanity check that the rule classifier is firing at the expected rate.
+    # Show how often the hybrid deferred to each sub-classifier
     print(
         f"  (hybrid used rule for {(out['hybrid_method']=='rule').sum()}/{n}, "
         f"zero-shot for {(out['hybrid_method']=='zero-shot').sum()}/{n})"

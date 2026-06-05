@@ -1,11 +1,12 @@
-"""Evaluate a rule + zero-shot hybrid against the sealed gold set.
+"""
+Evaluate a rule + zero-shot hybrid against the sealed gold set.
 
 Strategy (rule-first): use the rule classifier's label whenever it fires
 (i.e. is not "Unknown"), otherwise fall back to the zero-shot label. The
 rule classifier is high-precision but low-coverage, so this keeps its
 wins where it has an opinion and leans on zero-shot for everything else.
 
-This strategy is deliberately fixed -- it is NOT tuned on the gold set,
+This strategy is deliberately fixed and is NOT tuned on the gold set,
 which is sealed for final evaluation. Tune any thresholds on the dev set
 (see evaluate_dev.py) instead.
 
@@ -14,9 +15,6 @@ every gold paper is a member of that corpus, so we join the cached
 predictions by paper_id rather than re-running anything:
     data/processed/corpus_labeled.csv     -- rule predictions
     data/processed/corpus_labeled_zs.csv  -- zero-shot predictions
-Run `python src/classify/rule_classifier.py` and
-`python src/classify/zero_shot.py` first (and re-run whichever changed)
-so the caches reflect the current classifier config.
 
 Output: data/processed/gold_hybrid_eval.csv with the gold label, all three
 predictions + confidences, which method the hybrid used, and per-classifier
@@ -39,11 +37,12 @@ OUTPUT_PATH = REPO_ROOT / "data" / "processed" / "gold_hybrid_eval.csv"
 def combine(
     rule_pred: str, rule_conf: float, zs_pred: str, zs_conf: float
 ) -> tuple[str, float, str]:
-    """Rule-first hybrid: rule label when it fires, else zero-shot.
+    """
+    Rule-first hybrid: rule label when it fires, else zero-shot.
 
     Returns (label, confidence, method) where method is "rule" or
     "zero-shot". The rule classifier emits "Unknown" when no rule matched
-    or the top labels tied -- in that case we defer to zero-shot.
+    or the top labels tied, in which case we defer to zero-shot.
     """
     if rule_pred != "Unknown":
         return rule_pred, rule_conf, "rule"
@@ -54,6 +53,7 @@ def main() -> None:
     gold = pd.read_csv(GOLD_PATH)
     print(f"Gold: {len(gold)} papers")
 
+    # ── Input validation ──────────────────────────────────────────────────────
     for path, script in (
         (RULE_PRED_PATH, "src/classify/rule_classifier.py"),
         (ZS_PRED_PATH, "src/classify/zero_shot.py"),
@@ -64,6 +64,10 @@ def main() -> None:
                 "generate the cached predictions for the corpus."
             )
 
+    # ── Join cached predictions ───────────────────────────────────────────────
+    # Both classifiers already ran over the whole corpus; pull their rule and
+    # zero-shot predictions onto the gold rows by paper_id rather than re-running
+    # the models.
     rule = pd.read_csv(RULE_PRED_PATH)
     zs = pd.read_csv(ZS_PRED_PATH)
     result = (
@@ -89,6 +93,7 @@ def main() -> None:
         )
     )
 
+    # Catch any gold paper missing from either cache before we score.
     unscored = result[
         result["rule_predicted"].isna() | result["zs_predicted"].isna()
     ]
@@ -104,6 +109,7 @@ def main() -> None:
 
     result["gold_label"] = result["manual_label"]
 
+    # ── Hybrid combine ────────────────────────────────────────────────────────
     hybrid = [
         combine(rp, rc, zp, zc)
         for rp, rc, zp, zc in zip(
@@ -117,10 +123,12 @@ def main() -> None:
     result["hybrid_confidence"] = [h[1] for h in hybrid]
     result["hybrid_method"] = [h[2] for h in hybrid]
 
+    # ── Correctness flags ─────────────────────────────────────────────────────
     result["rule_correct"] = result["rule_predicted"] == result["gold_label"]
     result["zs_correct"] = result["zs_predicted"] == result["gold_label"]
     result["hybrid_correct"] = result["hybrid_predicted"] == result["gold_label"]
 
+    # ── Write output ──────────────────────────────────────────────────────────
     out = result[[
         "paper_id",
         "title",
@@ -140,6 +148,7 @@ def main() -> None:
     out.to_csv(OUTPUT_PATH, index=False)
     print(f"\nWrote {len(out)} evaluated papers to {OUTPUT_PATH}")
 
+    # ── Overall accuracy ──────────────────────────────────────────────────────
     n = len(out)
     print(
         f"\nRule accuracy:      {int(out['rule_correct'].sum())}/{n} = "
@@ -158,6 +167,7 @@ def main() -> None:
         f"zero-shot for {(out['hybrid_method']=='zero-shot').sum()}/{n})"
     )
 
+    # ── Per-class accuracy ────────────────────────────────────────────────────
     print("\nPer-class accuracy (rows = gold label):")
     per_class = out.groupby("gold_label").agg(
         count=("gold_label", "size"),
@@ -190,6 +200,7 @@ def main() -> None:
         .to_string()
     )
 
+    # ── Confusion matrix ──────────────────────────────────────────────────────
     print("\nHybrid confusion matrix (rows = gold, cols = hybrid_predicted):")
     print(pd.crosstab(out["gold_label"], out["hybrid_predicted"]).to_string())
 

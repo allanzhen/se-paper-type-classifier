@@ -1,4 +1,11 @@
-"""Clean the raw Technical Debt corpus.
+"""
+Clean the raw Technical Debt corpus.
+
+LEGACY: this is the superseded Semantic-Scholar cleaning pipeline. The live
+corpus is now produced by collect_dblp.py -> fetch_abstracts.py (DBLP), so
+main() here is no longer part of the active pipeline. The module is retained
+because its venue helpers `normalise()` and `extract_acronym()` are reusable
+(e.g. to re-derive CORE rank from a venue string) and are unit-tested.
 
 Reads per-query JSON caches in data/raw/semantic_scholar/, applies dedup +
 abstract-quality + year + CORE A/A* venue filters, writes the cleaned corpus
@@ -15,8 +22,6 @@ from pathlib import Path
 
 import pandas as pd
 
-# Resolve the project root two levels up so paths are stable regardless of
-# where the script is invoked from.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RAW_JSON_DIR = REPO_ROOT / "data" / "raw" / "semantic_scholar"  # per-query cache files
 CORE_CONF_PATH = REPO_ROOT / "data" / "raw" / "core_rankings.csv"
@@ -59,7 +64,7 @@ _NORMALISE_PREFIXES = [
     "acm",
 ]
 
-# Pre-compiled regexes used by normalise() — compiled once at import time for speed.
+# Pre-compiled regexes used by normalise()
 _YEAR_RE            = re.compile(r"\b(?:19|20)\d{2}\b")       # e.g. "2023", "1998"
 _ORDINAL_RE         = re.compile(r"\b\d+(?:st|nd|rd|th)\b")   # e.g. "42nd", "1st"
 _PAREN_RE           = re.compile(r"\s*\([^)]*\)")              # any parenthetical block
@@ -111,9 +116,8 @@ def extract_acronym(venue: str | None) -> str:
     """
     Pull a likely acronym out of a parenthetical, e.g. "...(ICSE)" -> "icse".
 
-    Filters out long parentheticals like "(was ESEC/FSE, changed 2024)" — only
+    Filters out long parentheticals like "(was ESEC/FSE, changed 2024)" only
     accepts short, space-free candidates with at least one uppercase letter.
-    This gives a second lookup key when the full title doesn't match CORE.
     """
     if not venue or not isinstance(venue, str):
         return ""
@@ -155,7 +159,7 @@ def _load_core_csv(path: Path) -> list[tuple[str, str | None, str]]:
       - Journal export: has a header row with columns id, title, source,
         rank, has changed?, for1, ... (no acronym column)
 
-    We sniff the first cell to detect which format we're reading so the same
+    We check the first cell to detect which format we're reading so the same
     function handles both files without separate code paths.
     """
     # Read without a header first to inspect the first cell.
@@ -171,7 +175,7 @@ def _load_core_csv(path: Path) -> list[tuple[str, str | None, str]]:
         acronym = df[cols["acronym"]] if "acronym" in cols else None
         rank    = df[cols["rank"]]
     else:
-        # Conference export — use fixed column positions.
+        # Conference export so use fixed column positions.
         df      = raw
         title   = df[1]
         acronym = df[2] if df.shape[1] > 2 else None
@@ -204,8 +208,8 @@ def load_core_rankings() -> dict[str, str]:
 
     Both the full title and the short acronym of each venue are normalised and
     added as keys so either form can be matched at lookup time. On key collision
-    (multiple entries normalise to the same string), the highest rank wins —
-    this prevents a lower-ranked duplicate from masking an A/A* venue.
+    (multiple entries normalise to the same string) the highest rank wins,
+    preventing a lower-ranked duplicate from masking an A/A* venue.
     """
     mapping: dict[str, str] = {}
     for path in (CORE_CONF_PATH, CORE_JOURNAL_PATH):
@@ -222,7 +226,7 @@ def load_core_rankings() -> dict[str, str]:
                 key = normalise(candidate)
                 if not key:
                     continue
-                # Keep the higher rank on collision — never downgrade a venue.
+                # Keep the higher rank on collision
                 old_p = _RANK_PRIORITY.get(mapping.get(key, ""), 0)
                 if new_p > old_p:
                     mapping[key] = rank

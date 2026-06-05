@@ -1,11 +1,11 @@
-"""Zero-shot paper-type classifier using a Hugging Face NLI model.
+"""
+Zero-shot paper-type classifier using a Hugging Face NLI model.
 
 Treats classification as natural-language inference: for each candidate
 label, the model scores how strongly the hypothesis "This paper is
 <label>" is entailed by the paper's title+abstract. The label with the
 highest entailment score wins. Unlike the rule-based classifier, this
-always returns a label -- if you want an "Unknown" bucket, threshold
-on the `confidence_zs` column downstream.
+always returns a label
 
 Runs on Apple-Silicon MPS when available, else CPU. Expect roughly
 10-20 minutes on 470 papers on MPS, ~30-60 min on CPU.
@@ -25,7 +25,7 @@ import torch
 from transformers import pipeline
 
 REPO_ROOT   = Path(__file__).resolve().parents[2]
-INPUT_PATH  = REPO_ROOT / "data" / "processed" / "corpus.csv"            # cleaned corpus from clean_corpus.py
+INPUT_PATH  = REPO_ROOT / "data" / "processed" / "corpus.csv"            
 OUTPUT_PATH = REPO_ROOT / "data" / "processed" / "corpus_labeled_zs.csv" # corpus with zero-shot predictions appended
 
 # DeBERTa-v3-large fine-tuned on four NLI datasets (MNLI, Fever-NLI, ANLI,
@@ -33,21 +33,18 @@ OUTPUT_PATH = REPO_ROOT / "data" / "processed" / "corpus_labeled_zs.csv" # corpu
 # zero-shot models on fine-grained classification tasks.
 MODEL_NAME = "MoritzLaurer/DeBERTa-v3-large-mnli-fever-anli-ling-wanli"
 
-# The model evaluates: does the abstract ENTAIL this hypothesis?
-# The curly-brace placeholder is filled by each expanded label phrase.
+# The model evaluates: does the abstract entail this hypothesis?
 HYPOTHESIS_TEMPLATE = "This paper is {}."
 
 # Maps the short output label to the expanded natural-language phrase fed to
-# the NLI model. The expanded phrase is what the model actually reads, so its
+# the NLI model. The expanded phrase is what the model actually reads, so the
 # wording directly controls classification accuracy. Tune the expanded phrases
-# (not the short names) to shift accuracy on ambiguous classes; the short
-# names are stable identifiers used everywhere else in the pipeline.
+# to shift accuracy on ambiguous classes; the short names are stable identifiers 
+# used everywhere else in the pipeline.
 #
 # NOTE on wording style: keep each phrase SHORT, POSITIVE, and crisp. NLI
 # zero-shot scores whether the abstract entails the *whole* hypothesis, so long
-# compound phrases dilute the signal and negation ("does not introduce a tool")
-# tends to backfire -- the model keys on the negated noun and scores it higher.
-# An earlier negation-heavy rewrite measured ~2% worse and was reverted here.
+# compound phrases dilute the signal and negation tends to backfire
 LABELS: dict[str, str] = {
     "Empirical Study": (
         "an empirical study that analyzes data mined or measured from real "
@@ -95,7 +92,8 @@ EXPANDED_TO_SHORT = {v: k for k, v in LABELS.items()}  # maps expanded phrase ba
 
 
 def _pick_device() -> str | int:
-    """Return the best available device identifier for the transformers pipeline.
+    """
+    Return the best available device identifier for the transformers pipeline.
 
     Returns "mps" on Apple Silicon (significantly faster than CPU for NLI),
     or -1, which is the transformers convention for CPU inference.
@@ -106,7 +104,8 @@ def _pick_device() -> str | int:
 
 
 def build_pipeline():
-    """Load the NLI model and return a configured zero-shot pipeline.
+    """
+    Load the NLI model and return a configured zero-shot pipeline.
 
     Model loading is the slow step (~30s on first call, faster after the
     weights are cached locally by Hugging Face). Call this once and pass
@@ -119,14 +118,14 @@ def build_pipeline():
         model=MODEL_NAME,
         device=device,
     )
-    # DeBERTa has a hard 512-token context window. Without this cap, very long
-    # abstracts raise a runtime error rather than being truncated gracefully.
+    # DeBERTa has a hard 512-token context window
     clf.tokenizer.model_max_length = 512
     return clf
 
 
 def classify_papers(df: pd.DataFrame, clf=None) -> pd.DataFrame:
-    """Run zero-shot classification on a DataFrame of papers.
+    """
+    Run zero-shot classification on a DataFrame of papers.
 
     Requires 'title' and 'abstract' columns. Returns a copy of df with
     three new columns appended:
@@ -150,7 +149,7 @@ def classify_papers(df: pd.DataFrame, clf=None) -> pd.DataFrame:
     all_scores: list[str] = []
 
     for idx, row in df.iterrows():
-        # Guard against NaN fields — the NLI model requires a plain string.
+        # Guard against NaN fields 
         title    = "" if pd.isna(row.get("title"))    else str(row["title"])
         abstract = "" if pd.isna(row.get("abstract")) else str(row["abstract"])
 
@@ -190,7 +189,7 @@ def classify_papers(df: pd.DataFrame, clf=None) -> pd.DataFrame:
 
     df["predicted_type_zs"] = labels
     df["confidence_zs"]     = confs
-    df["zs_scores"]         = all_scores  # JSON string — parse with json.loads() downstream
+    df["zs_scores"]         = all_scores 
     return df
 
 
@@ -205,8 +204,6 @@ def main() -> None:
     df.to_csv(OUTPUT_PATH, index=False)
     print(f"\nWrote {len(df)} labeled papers to {OUTPUT_PATH}")
 
-    # Distribution check — a heavily skewed distribution suggests a label
-    # phrasing issue or a corpus bias worth investigating before evaluation.
     print("\nPredicted-type distribution (zero-shot):")
     print(df["predicted_type_zs"].value_counts().to_string())
     print(f"\nMean top-1 confidence: {df['confidence_zs'].mean():.3f}")

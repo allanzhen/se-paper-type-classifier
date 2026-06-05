@@ -2,9 +2,6 @@
 Fetch abstracts from Semantic Scholar for papers found via DBLP.
 Reads data/interim/dblp_papers.csv, looks up each paper by DOI or title,
 and saves the enriched corpus to data/processed/corpus.csv.
-
-Run from project root:
-    python src/ingest/fetch_abstracts.py
 """
 
 import time
@@ -12,24 +9,19 @@ import requests
 import pandas as pd
 from pathlib import Path
 
-# Resolve the project root two levels up so paths work regardless of the
-# working directory the script is launched from.
 REPO_ROOT   = Path(__file__).resolve().parents[2]
 INPUT_PATH  = REPO_ROOT / "data" / "interim" / "dblp_papers.csv"   # output of collect_dblp.py
 OUTPUT_PATH = REPO_ROOT / "data" / "processed" / "corpus.csv"       # final enriched corpus
 
 # Semantic Scholar API endpoints.
-# DOI lookup is an exact match; search is a fuzzy title query.
 SS_DOI_URL   = "https://api.semanticscholar.org/graph/v1/paper/DOI:{}"
 SS_SEARCH_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
 
-# Only request the fields we actually use — keeps payloads small.
+# Only request the fields we actually use to keep payloads small.
 FIELDS = "paperId,title,abstract,year,venue"
 
-# 3 seconds between requests is conservative for the unauthenticated rate limit
-# (~100 req/min). Increase if you add an API key.
+# 3 seconds between requests (~100 req/min). Increase if you add an API key.
 DELAY  = 3
-
 
 def fetch_by_doi(doi: str) -> dict | None:
     """
@@ -60,7 +52,7 @@ def fetch_by_title(title: str) -> dict | None:
     Look up a paper on Semantic Scholar by title search.
 
     Used as a fallback when no DOI is available. Requests only the top result
-    (limit=1) — callers should be aware this can return a different paper if
+    (limit=1); callers should be aware this can return a different paper if
     the title is ambiguous or the DBLP title differs slightly from S2's index.
     Returns the first result dict, or None on failure or empty results.
     """
@@ -84,18 +76,17 @@ def main():
     df = pd.read_csv(INPUT_PATH)
     print(f"Loaded {len(df)} papers")
 
-    abstracts   = []   # parallel list — one entry per row in df
+    abstracts   = []   # one entry per row in df
     paper_ids   = []   # Semantic Scholar internal IDs, useful for cross-referencing
     found       = 0
     not_found   = 0
 
     for i, row in df.iterrows():
-        # Print a progress indicator with a truncated title so the log stays readable.
         print(f"  [{i+1}/{len(df)}] {row['title'][:60]}...")
 
         result = None
 
-        # Try DOI first — most reliable identifier, avoids false title matches.
+        # Try DOI first
         if pd.notna(row.get("doi")) and row["doi"]:
             result = fetch_by_doi(row["doi"])
             time.sleep(DELAY)   # rate-limit pause after every API call
@@ -105,14 +96,12 @@ def main():
             result = fetch_by_title(row["title"])
             time.sleep(DELAY)
 
-        # Only record a hit if we actually got an abstract — an empty abstract
-        # is as useless as no result for the downstream classifier.
+        # Only record a hit if we actually got an abstract
         if result and result.get("abstract"):
             abstracts.append(result["abstract"])
             paper_ids.append(result.get("paperId", ""))
             found += 1
         else:
-            # Append empty strings to keep the lists aligned with df rows.
             abstracts.append("")
             paper_ids.append("")
             not_found += 1

@@ -1,4 +1,5 @@
-"""Evaluate the zero-shot classifier against the hand-labeled gold set.
+"""
+Evaluate the zero-shot classifier against the hand-labeled gold set.
 
 The gold file (data/gold/gold_standard_papers.csv) has columns
 [paper_id, title, abstract, manual_label], with `manual_label` already
@@ -10,10 +11,6 @@ produced for the whole corpus by src/classify/zero_shot.py
 (data/processed/corpus_labeled_zs.csv) and join them onto the gold rows by
 paper_id. Every gold paper is a member of that corpus, so this scores the
 exact committed predictions in well under a second.
-
-Run `python src/classify/zero_shot.py` first (and re-run it whenever the
-hypothesis templates change) so the cached predictions reflect the current
-model config.
 
 Output: data/processed/gold_zs_eval.csv with the gold label, the zero-shot
 top-1 prediction + confidence, the full per-label score dict, and a

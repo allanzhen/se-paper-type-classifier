@@ -1,4 +1,5 @@
-"""Apply the rule + zero-shot hybrid to the whole corpus and save the labels.
+"""
+Apply the rule + zero-shot hybrid to the whole corpus and save the labels.
 
 The hybrid (rule-first: use the rule's label when it fires, else zero-shot) is
 the project's best classifier. evaluate_hybrid.py only scores it on the 100-paper
@@ -10,7 +11,7 @@ reportable dataset:
 
 Run `python src/classify/rule_classifier.py` and `python src/classify/zero_shot.py`
 first so the caches are current. The hybrid emits a label for every paper (no
-"Unknown" — it falls back to zero-shot when no rule fires).
+"Unknown" labels).
 """
 
 import sys
@@ -20,7 +21,7 @@ import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src" / "evaluate"))
-from evaluate_hybrid import combine  # noqa: E402  — reuse the single combine definition
+from evaluate_hybrid import combine  # noqa: E402
 
 RULE_PRED_PATH = REPO_ROOT / "data" / "processed" / "corpus_labeled.csv"
 ZS_PRED_PATH   = REPO_ROOT / "data" / "processed" / "corpus_labeled_zs.csv"

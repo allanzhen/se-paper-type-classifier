@@ -1,4 +1,5 @@
-"""Rule-based paper-type classifier.
+"""
+Rule-based paper-type classifier.
 
 Reads data/processed/corpus.csv, applies the keyword/phrase rules from
 rules.py to each paper's title+abstract, and writes
@@ -21,11 +22,8 @@ from pathlib import Path
 
 import pandas as pd
 
-# Add the classify directory to sys.path so rules.py can be imported as a
-# sibling module without restructuring the package layout.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from rules import (  # noqa: E402  — import must follow sys.path insert
-    COMPILED,
+from rules import (  # noqa: E402
     PRACTITIONER_SURVEY,
     PROTOCOL,
     SECONDARY_STUDY,
@@ -47,7 +45,8 @@ OUTPUT_PATH = REPO_ROOT / "data" / "processed" / "corpus_labeled.csv" # corpus w
 def _classify_tree(
     text: str, scores: dict[str, int]
 ) -> tuple[str, float, str, list[str]] | None:
-    """Apply the Survey/SLR/Empirical decision tree; None = tree doesn't decide.
+    """
+    Apply the Survey/SLR decision tree; None = tree doesn't decide.
 
     Implements the "Labeling Decision Procedure" from
     docs/Paper Type Definitions.md as a precedence layer:
@@ -86,7 +85,8 @@ def _classify_tree(
 
 
 def classify(title: str, abstract: str) -> tuple[str, float, str, list[str]]:
-    """Classify one paper using keyword/phrase match counts.
+    """
+    Classify one paper using keyword/phrase match counts.
 
     Concatenates title and abstract, then counts how many compiled regex
     patterns from rules.py match for each label. The label with the most
@@ -119,8 +119,7 @@ def classify(title: str, abstract: str) -> tuple[str, float, str, list[str]]:
     # SLR (Step 2A), and a questionnaire makes a primary study a Survey (2B).
     # We skip the tree when a Tool/Theoretical contribution clearly dominates,
     # so a model/tool paper that merely grounds itself in a review isn't
-    # mislabeled as a secondary study (the mixed-method "dominant contribution"
-    # rule from the doc).
+    # mislabeled as a secondary study
     tree = _classify_tree(text, scores)
     if tree is not None:
         return tree
@@ -130,17 +129,15 @@ def classify(title: str, abstract: str) -> tuple[str, float, str, list[str]]:
     top_label, top_score   = ranked[0]
     second_score = ranked[1][1] if len(ranked) > 1 else 0
 
-    # No rule fired at all — paper is too ambiguous or outside the taxonomy.
+    # No rule fired at all
     if top_score == 0:
         return "Unknown", 0.0, "no_match", []
 
-    # Documented precedence (Tool Paper definition; docs/Paper Type Definitions.md
-    # and the comment on the Tool Paper rules): a newly built artifact that is
-    # ALSO empirically evaluated is a Tool Paper, not an Empirical Study. The flat
-    # vote can't see this — it leaves such papers as a Tool|Empirical tie (->
-    # Unknown -> zero-shot, which is weak on tools) or lets the evaluation cues
-    # win. So when the top of the vote is a Tool-vs-Empirical contest, award it to
-    # Tool Paper. Scoped STRICTLY to Empirical: other contests (e.g.
+    # A newly built artifact that is also empirically evaluated is a Tool Paper, 
+    # not an Empirical Study. The flat vote can't see this and leaves such papers 
+    # as a Tool|Empirical tie (-> Unknown -> zero-shot, which is weak on tools) or 
+    # lets the evaluation cues win. So when the top of the vote is a Tool-vs-Empirical 
+    # contest, award it to Tool Paper. Scoped strictly to Empirical: other contests (e.g.
     # Tool|Experience Report on "SoHist", Tool|Theoretical on "Combining
     # Insights") are left alone because those non-Tool labels are often correct.
     tool_score = scores["Tool Paper"]
@@ -176,18 +173,13 @@ def classify(title: str, abstract: str) -> tuple[str, float, str, list[str]]:
             matches["Case Study"],
         )
 
-    # Two or more labels tied — a winner can't be chosen without a tiebreaker,
+    # Two or more labels tied so a winner can't be chosen without a tiebreaker,
     # so we surface this as Unknown with a diagnostic reason string.
     if top_score == second_score:
         tied  = [label for label, score in ranked if score == top_score]
-        # Report the union of all matched patterns across tied labels so the
-        # reason string is useful for debugging which rules are conflicting.
         union = sorted({h for label in tied for h in matches[label]})
         return "Unknown", 0.0, "tie:" + "|".join(tied), union
 
-    # Confidence is the fraction of total top-two votes that the winner holds.
-    # A clear winner with no second-place matches scores 1.0; a narrow win
-    # (e.g. 2 vs 1) scores ~0.67. This stays in [0, 1] without needing softmax.
     confidence = top_score / (top_score + second_score)
     return top_label, confidence, "", matches[top_label]
 
@@ -196,7 +188,7 @@ def main() -> None:
     df = pd.read_csv(INPUT_PATH)
     print(f"Loaded {len(df)} papers from {INPUT_PATH.name}")
 
-    # Parallel lists — one entry per row, appended in order so alignment with
+    # one entry per row, appended in order so alignment with
     # df is guaranteed without needing a merge step at the end.
     labels, confs, reasons, hit_lists = [], [], [], []
 
@@ -232,9 +224,6 @@ def main() -> None:
         # Bucket ties by their full reason ("tie:A|B") for visibility.
         print(unknown["unknown_reason"].value_counts().to_string())
 
-    # Coverage and mean confidence on the papers that were successfully labeled.
-    # Low coverage suggests the rules are too narrow; low confidence suggests
-    # many near-ties that could be resolved by adding stronger patterns.
     labeled = df[df["predicted_type"] != "Unknown"]
     if len(labeled):
         print(

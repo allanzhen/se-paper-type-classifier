@@ -1,19 +1,20 @@
-"""Corpus paper-type distribution: overall mix + trend over time.
+"""
+Corpus paper-type distribution: overall mix + trend over time.
 
 Reports the variety of paper types across the whole technical-debt corpus using
 the hybrid classifier's predictions (data/processed/corpus_labeled_hybrid.csv,
-produced by src/evaluate/label_corpus_hybrid.py). Writes one figure to
+produced by src/evaluate/label_corpus_hybrid.py). Writes two figures to
 results/figures/corpus_type_distribution.png:
 
-    Panel 1 -- overall type counts (horizontal bar, count + % of corpus)
-    Panel 2 -- type counts per year (stacked bar), showing how the field's
+    Figure 1 -- overall type counts (pie chart, count + % of corpus)
+    Figure 2 -- type counts per year (stacked bar), showing how the field's
                methodology mix grows and diversifies over time
 
-Labels are PREDICTED (hybrid ~80% accurate on the gold set), so the distribution
+Labels are predicted (hybrid ~80% accurate on the gold set), so the distribution
 is an estimate of the field's methodology mix, not exact hand-counted totals.
-
-Run from the project root: `python src/viz/corpus_type_distribution.py`.
 """
+
+import sys
 
 import matplotlib
 
@@ -24,29 +25,17 @@ import pandas as pd
 import seaborn as sns
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "classify"))
+from labels import CANONICAL_LABELS, SHORT_LABELS  # noqa: E402
+
 LABELED_PATH = Path("data/processed/corpus_labeled_hybrid.csv")
 FIGURES_DIR  = Path("results/figures")
 
-# Fixed colour per paper type, reused across both panels so a type reads the same
-# everywhere. Ordered most→least common for a stable legend/stack order.
-TYPE_ORDER = [
-    "Empirical Study", "Tool Paper", "Case Study", "Theoretical Contribution",
-    "Survey", "Position Paper", "Experience Report",
-    "Systematic Literature Review", "Controlled Experiment",
-]
+# Most -> least common order (from the shared taxonomy) gives a stable legend/stack
+# order; a fixed colour per type is reused across both panels.
+TYPE_ORDER = list(CANONICAL_LABELS)
 TYPE_PALETTE = dict(zip(TYPE_ORDER, sns.color_palette("tab10", len(TYPE_ORDER))))
-
-LABEL_SHORT: dict[str, str] = {
-    "Empirical Study": "Empirical Study",
-    "Tool Paper": "Tool Paper",
-    "Case Study": "Case Study",
-    "Theoretical Contribution": "Theoretical",
-    "Survey": "Survey",
-    "Position Paper": "Position Paper",
-    "Experience Report": "Experience Report",
-    "Systematic Literature Review": "SLR",
-    "Controlled Experiment": "Controlled Exp.",
-}
+LABEL_SHORT = SHORT_LABELS
 
 
 def load_labeled() -> pd.DataFrame:
@@ -62,12 +51,10 @@ def load_labeled() -> pd.DataFrame:
 
 
 def plot_overall(df: pd.DataFrame, ax: plt.Axes) -> None:
-    """Pie chart of paper-type share, slices coloured to match the trend panel."""
+    # Pie chart of paper-type share, slices coloured to match the trend panel. 
     counts = df["hybrid_label"].value_counts()
     counts = counts.reindex([t for t in TYPE_ORDER if t in counts.index])
     n = len(df)
-    # Percentage on slices big enough to read (>=4%); the small slices crowd if
-    # labelled on the pie, so all types are identified by the side legend instead.
     def _autopct(pct: float) -> str:
         return f"{pct:.0f}%" if pct >= 4 else ""
     wedges, _, _ = ax.pie(
@@ -85,7 +72,7 @@ def plot_overall(df: pd.DataFrame, ax: plt.Axes) -> None:
         [f"{LABEL_SHORT[t]} — {v} ({100 * v / n:.0f}%)" for t, v in counts.items()],
         title="Paper Type",
         loc="center right",
-        bbox_to_anchor=(-0.05, 0.5),  # sit in the empty space to the left of the pie
+        bbox_to_anchor=(-0.05, 0.5), 
         fontsize=8,
         title_fontsize=9,
     )
@@ -93,7 +80,7 @@ def plot_overall(df: pd.DataFrame, ax: plt.Axes) -> None:
 
 
 def plot_trend(df: pd.DataFrame, ax: plt.Axes) -> None:
-    """Stacked bar of paper counts per year, coloured by type."""
+    # Stacked bar of paper counts per year, coloured by type.
     pivot = (
         df.groupby(["year", "hybrid_label"]).size().unstack(fill_value=0)
         .reindex(columns=[t for t in TYPE_ORDER if t in df["hybrid_label"].unique()])

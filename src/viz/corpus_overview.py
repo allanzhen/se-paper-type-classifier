@@ -1,13 +1,11 @@
-"""Corpus overview visualizations: papers per year and top venues.
+"""
+Corpus overview visualizations: papers per year and top venues.
 
 The corpus (data/processed/corpus.csv) is collected from DBLP and already
-filtered to A/A* venues, so it has columns [title, year, venue, doi, url,
-abstract, paper_id] -- there is no per-paper CORE-rank column to break down by.
-This figure therefore reports the two dimensions that are present: publication
-year (field growth) and venue concentration.
+filtered to A/A* venues, so this figure therefore reports the two dimensions 
+that are present: publication year (field growth) and venue concentration.
 
-Writes results/figures/corpus_overview.png. Run from the project root:
-`python src/viz/corpus_overview.py`.
+Writes results/figures/corpus_overview.png. 
 """
 
 import matplotlib
@@ -19,7 +17,6 @@ import pandas as pd
 import seaborn as sns
 from pathlib import Path
 
-# Relative paths work here because this script is run from the project root.
 CORPUS_PATH  = Path("data/processed/corpus.csv")
 FIGURES_DIR  = Path("results/figures")
 TOP_N_VENUES = 15        # how many venues to show in the bar chart
@@ -28,21 +25,21 @@ MAX_LABEL    = 32        # truncate long venue strings on the y-axis
 
 
 def load_corpus() -> pd.DataFrame:
-    """Load the corpus and coerce year to int.
+    """
+    Load the corpus and coerce year to int.
 
     Drops rows with a missing year so the per-year groupby doesn't produce a
     spurious NaN bucket on the x-axis.
     """
     df = pd.read_csv(CORPUS_PATH)
     df = df.dropna(subset=["year"])
-    # Year arrives as float from pandas (possible NaN before dropna); cast to int
-    # so x-labels show "2015" not "2015.0".
+    # Year arrives as float from pandas so cast to int
     df["year"] = df["year"].astype(int)
     return df
 
 
 def plot_year_distribution(df: pd.DataFrame, ax: plt.Axes) -> None:
-    """Bar chart of paper counts per year, with the count above each bar."""
+    # Bar chart of paper counts per year, with the count above each bar.
     counts = df["year"].value_counts().sort_index()
     bars = ax.bar(counts.index, counts.values, color=BAR_COLOR, edgecolor="white")
     for bar, v in zip(bars, counts.values):
@@ -56,11 +53,7 @@ def plot_year_distribution(df: pd.DataFrame, ax: plt.Axes) -> None:
 
 
 def plot_venue_distribution(df: pd.DataFrame, ax: plt.Axes) -> None:
-    """Pie of the top N venues (+ an 'Other' wedge for the rest of the corpus).
-
-    Including 'Other' keeps the pie a true part-of-whole: every wedge is a share
-    of the full corpus (n), not of the top-N subtotal.
-    """
+    # Pie of the top N venues (+ an 'Other' wedge for the rest of the corpus).
     n = len(df)
     top = df["venue"].value_counts().head(TOP_N_VENUES)
     other = n - int(top.sum())
@@ -71,7 +64,7 @@ def plot_venue_distribution(df: pd.DataFrame, ax: plt.Axes) -> None:
     ]
     sizes  = list(top.values)
     colors = list(sns.color_palette("tab20", len(top)))
-    if other > 0:                       # long tail of remaining venues
+    if other > 0:                       
         labels.append(f"Other ({df['venue'].nunique() - len(top)} venues)")
         sizes.append(other)
         colors.append("#BBBBBB")        # neutral grey for the catch-all

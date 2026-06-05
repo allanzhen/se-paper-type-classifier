@@ -2,9 +2,6 @@
 Collect Technical Debt papers from DBLP.
 Uses per-query checkpoint files so partial progress survives restarts.
 If a query's JSON file already exists, it skips that query entirely.
-
-Run from project root:
-    python src/ingest/collect_dblp.py
 """
 
 import json
@@ -13,8 +10,6 @@ import requests
 import pandas as pd
 from pathlib import Path
 
-# Resolve project root two levels up from this file so paths are stable
-# regardless of where the script is invoked from.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORE_CONF_PATH    = REPO_ROOT / "data" / "raw" / "core_rankings.csv"
 CORE_JOURNAL_PATH = REPO_ROOT / "data" / "raw" / "core_journal_rankings.csv"
@@ -47,11 +42,10 @@ QUERIES = [
     "techdebt",
 ]
 
-MIN_YEAR = 2010  # discard papers older than this — pre-2010 coverage is sparse
+MIN_YEAR = 2010  # discard papers older than this
 DBLP_URL = "https://dblp.org/search/publ/api"
 DELAY_BETWEEN_PAGES   = 5   # seconds between pages within a query
 DELAY_BETWEEN_QUERIES = 15  # seconds between queries
-
 
 # ── CORE VENUES ───────────────────────────────────────────────────────────────
 
@@ -69,7 +63,7 @@ def load_core_venues() -> set[str]:
             print(f"  Missing: {path.name}")
             continue
         try:
-            # No header row — column positions are fixed by the CORE CSV format.
+            # No header row since column positions are fixed by the CORE CSV format.
             df = pd.read_csv(path, dtype=str, header=None)
             for _, row in df.iterrows():
                 # Column 4 holds the rank; fall back to the last column for
@@ -110,7 +104,6 @@ def is_quality_venue(venue: str, core_venues: set[str]) -> bool:
             return True
     return False
 
-
 # ── DBLP FETCHER WITH CHECKPOINTING ──────────────────────────────────────────
 
 def load_or_fetch(query: str) -> list[dict]:
@@ -135,7 +128,7 @@ def load_or_fetch(query: str) -> list[dict]:
     print(f"Fetching: '{query}'")
     papers = []
 
-    # DBLP's API pages results in blocks of 100; iterate up to 1 000 results.
+    # DBLP's API pages results in blocks of 100; iterate up to 1000 results.
     for start in range(0, 1000, 100):
         params = {
             "q":      query,
@@ -146,7 +139,7 @@ def load_or_fetch(query: str) -> list[dict]:
         try:
             r = requests.get(DBLP_URL, params=params, timeout=20)
             if r.status_code == 429:
-                # DBLP is rate-limiting us; save what we have and stop this query
+                # If DBLP is rate-limiting us, save what we have and stop this query
                 # rather than hammering the server.
                 print(f"  Rate limited — saving progress and stopping this query")
                 break
@@ -167,7 +160,7 @@ def load_or_fetch(query: str) -> list[dict]:
             print(f"  Request failed: {e} — saving progress")
             break
 
-    # save whatever we got — even partial results are cached so a later run
+    # save whatever we got, even partial results are cached so a later run
     # won't re-fetch and will instead start from the next uncached query.
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     cache_path.write_text(
@@ -176,7 +169,6 @@ def load_or_fetch(query: str) -> list[dict]:
     print(f"  Cached {len(papers)} raw hits to {cache_path.name}")
     return papers
 
-
 # ── PARSE + FILTER ────────────────────────────────────────────────────────────
 
 def parse_paper(hit: dict) -> dict | None:
@@ -184,7 +176,8 @@ def parse_paper(hit: dict) -> dict | None:
     Extract and clean fields from a single DBLP hit dict.
 
     Returns None for records that are missing a title or venue, or that
-    predate MIN_YEAR — these are not useful for the classifier corpus.
+    predate MIN_YEAR.
+
     DBLP occasionally returns lists instead of strings for title and venue;
     both cases are normalized here.
     """
@@ -195,7 +188,7 @@ def parse_paper(hit: dict) -> dict | None:
     doi   = info.get("doi", "")
     url   = info.get("url", "")
 
-    # venue can come back as a list — take the first item
+    # venue can come back as a list so we take the first item
     if isinstance(venue, list):
         venue = venue[0] if venue else ""
 
@@ -203,14 +196,14 @@ def parse_paper(hit: dict) -> dict | None:
     if isinstance(title, list):
         title = title[0] if title else ""
 
-    # Drop records with no title or venue — they can't be used.
+    # Drop records with no title or venue
     if not title or not venue:
         return None
     try:
         if int(year) < MIN_YEAR:
             return None
     except (ValueError, TypeError):
-        # year field is missing or non-numeric; discard the record.
+        # year field is missing or non-numeric
         return None
 
     return {
@@ -220,7 +213,6 @@ def parse_paper(hit: dict) -> dict | None:
         "doi":   doi.strip(),
         "url":   url.strip(),
     }
-
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 

@@ -1,48 +1,40 @@
-"""Evaluation result visualizations: classifier accuracy + hybrid confusion.
+"""
+Evaluation result visualizations: classifier accuracy + hybrid confusion.
 
 Reads the gold evaluation produced by src/evaluate/evaluate_hybrid.py
 (data/processed/gold_hybrid_eval.csv) and writes two figures to
 results/figures/:
 
-    accuracy_comparison.png   -- overall + per-class accuracy for the rule,
+    accuracy_comparison.png   -- overall & per-class accuracy for the rule,
                                  zero-shot, and hybrid classifiers
     hybrid_confusion_matrix.png -- gold vs hybrid-predicted label heatmap
-
-Run from the project root: `python src/viz/results_overview.py`.
 """
 
 import matplotlib
 
 matplotlib.use("Agg")  # headless backend: save files without opening a window
 
+import sys
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from pathlib import Path
 
-# Relative paths work because this script is run from the project root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "classify"))
+from labels import SHORT_LABELS  # noqa: E402 
+
+# Script is run from project root
 EVAL_PATH   = Path("data/processed/gold_hybrid_eval.csv")
 FIGURES_DIR = Path("results/figures")
 
-# One consistent colour per classifier, reused across every panel.
+# One consistent colour per classifier, reused across every panel
 PALETTE = {"Rule": "#55A868", "Zero-shot": "#4C72B0", "Hybrid": "#DD8452"}
-
-# The 8 canonical labels the gold set uses, abbreviated for compact axes.
-LABEL_SHORT: dict[str, str] = {
-    "Empirical Study":               "Empirical",
-    "Tool Paper":                    "Tool",
-    "Systematic Literature Review":  "SLR",
-    "Case Study":                    "Case Study",
-    "Survey":                        "Survey",
-    "Experience Report":             "Exp. Report",
-    "Theoretical Contribution":      "Theoretical",
-    "Position Paper":                "Position",
-    "Controlled Experiment":         "Controlled Exp.",
-}
+LABEL_SHORT = SHORT_LABELS
 
 
 def load_eval() -> pd.DataFrame:
-    """Load the gold hybrid evaluation produced by evaluate_hybrid.py."""
+    # Load the gold hybrid evaluation produced by evaluate_hybrid.py.
     if not EVAL_PATH.exists():
         raise SystemExit(
             f"{EVAL_PATH} not found. Run `python src/evaluate/evaluate_hybrid.py` first."
@@ -51,7 +43,7 @@ def load_eval() -> pd.DataFrame:
 
 
 def _per_class(df: pd.DataFrame) -> pd.DataFrame:
-    """Per-class accuracy (%) for each classifier, sorted by class size desc."""
+    # Per-class accuracy (%) for each classifier, sorted by class size desc.
     grp = df.groupby("gold_label")
     out = pd.DataFrame(
         {
@@ -65,7 +57,7 @@ def _per_class(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def plot_overall(df: pd.DataFrame, ax: plt.Axes) -> None:
-    """Three bars: overall accuracy of each classifier across all gold papers."""
+    # Three bars: overall accuracy of each classifier across all gold papers.
     n = len(df)
     accs = {
         "Rule":      df["rule_correct"].mean() * 100,
@@ -83,7 +75,7 @@ def plot_overall(df: pd.DataFrame, ax: plt.Axes) -> None:
 
 
 def plot_per_class(pc: pd.DataFrame, ax: plt.Axes) -> None:
-    """Grouped bars: rule vs zero-shot vs hybrid accuracy for each gold class."""
+    # Grouped bars: rule vs zero-shot vs hybrid accuracy for each gold class.
     labels = [f"{LABEL_SHORT.get(c, c)}\n(n={int(pc.loc[c, 'count'])})" for c in pc.index]
     x = range(len(pc))
     w = 0.27
@@ -99,7 +91,7 @@ def plot_per_class(pc: pd.DataFrame, ax: plt.Axes) -> None:
 
 
 def plot_confusion(df: pd.DataFrame) -> Path:
-    """Heatmap of gold label vs hybrid prediction; save and return the path."""
+    # Heatmap of gold label vs hybrid prediction, with counts in cells and accuracy in title.
     labels = [c for c in LABEL_SHORT if c in set(df["gold_label"]) | set(df["hybrid_predicted"])]
     cm = pd.crosstab(df["gold_label"], df["hybrid_predicted"]).reindex(
         index=labels, columns=labels, fill_value=0

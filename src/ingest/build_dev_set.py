@@ -1,4 +1,5 @@
-"""Build a 30-paper dev set for tuning the hybrid classifier.
+"""
+Build a 30-paper dev set for tuning the hybrid classifier.
 
 Excludes the 100 gold papers, then samples:
 - 27 papers stratified by zero-shot prediction (3 per class x 9 classes)
@@ -12,11 +13,15 @@ Requires data/processed/corpus_labeled.csv (rule predictions) and
 data/processed/corpus_labeled_zs.csv (zero-shot predictions) to exist.
 """
 
+import sys
 from pathlib import Path
 
 import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT / "src" / "classify"))
+from labels import CANONICAL_LABELS as ALL_CLASSES  # noqa: E402
+
 RULE_PATH   = REPO_ROOT / "data" / "processed" / "corpus_labeled.csv"     # rule classifier output
 ZS_PATH     = REPO_ROOT / "data" / "processed" / "corpus_labeled_zs.csv"  # zero-shot classifier output
 GOLD_PATH   = REPO_ROOT / "data" / "gold" / "gold_standard_papers.csv"    # papers already annotated
@@ -28,25 +33,12 @@ MIN_PER_CLASS     = 2   # minimum representation for each class after padding
 TARGET_TOTAL      = 30  # desired final dev-set size
 RANDOM_STATE      = 42  # fixed seed so the sample is reproducible across runs
 
-# Canonical list of paper-type classes used by both classifiers.
-# Listing them explicitly (rather than inferring from data) ensures padding
-# logic covers every class even if one has zero predictions in the corpus.
-ALL_CLASSES = (
-    "Empirical Study",
-    "Controlled Experiment",
-    "Systematic Literature Review",
-    "Survey",
-    "Tool Paper",
-    "Experience Report",
-    "Case Study",
-    "Position Paper",
-    "Theoretical Contribution",
-)
-
+# ALL_CLASSES (imported from labels.CANONICAL_LABELS) is the explicit canonical
+# class list, so the padding logic covers every class even when one has zero
+# predictions in the corpus.
 
 def main() -> None:
-    # Fail early with a clear message if the upstream outputs don't exist,
-    # rather than letting pandas raise a cryptic FileNotFoundError.
+    # Fail early with a clear message if the upstream outputs don't exist
     if not ZS_PATH.exists():
         raise SystemExit(
             f"{ZS_PATH.name} not found. Run src/classify/zero_shot.py first."
@@ -72,7 +64,7 @@ def main() -> None:
 
     # ── Exclude gold papers ───────────────────────────────────────────────────
     # Gold papers have already been manually annotated and are used for final
-    # evaluation — they must never appear in the dev set to avoid data leakage.
+    # evaluation so they must never appear in the dev set to avoid data leakage.
     before = len(df)
     df = df[~df["paper_id"].isin(gold_df["paper_id"])].reset_index(drop=True)
     print(f"Excluded {before - len(df)} gold papers; {len(df)} candidates remain")
@@ -99,8 +91,7 @@ def main() -> None:
     # ── Step 2: Disagreement sample ───────────────────────────────────────────
     # Papers where rule and zero-shot disagree are the most informative for
     # understanding each classifier's failure modes. We exclude "Unknown" rule
-    # predictions because those mean the rule simply didn't fire — that's not
-    # a real disagreement, just an abstention.
+    # predictions because those mean the rule simply didn't fire 
     remaining = df[~df["paper_id"].isin(used_ids)]
     disagree = remaining[
         (remaining["predicted_type"] != "Unknown")
@@ -123,7 +114,7 @@ def main() -> None:
     extra_parts: list[pd.DataFrame] = []
     for cls in ALL_CLASSES:
         # Count how many dev papers are already predicted as this class by
-        # either classifier — we want coverage, not just one signal.
+        # either classifier
         in_dev = (
             (dev["predicted_type_zs"] == cls) | (dev["predicted_type"] == cls)
         ).sum()

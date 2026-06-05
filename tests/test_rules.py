@@ -3,12 +3,7 @@
 import re
 
 import rules
-
-CANONICAL = {
-    "Empirical Study", "Controlled Experiment", "Systematic Literature Review",
-    "Survey", "Tool Paper", "Experience Report", "Case Study", "Position Paper",
-    "Theoretical Contribution",
-}
+from labels import CANONICAL_SET as CANONICAL
 
 
 def test_rules_labels_are_canonical():
