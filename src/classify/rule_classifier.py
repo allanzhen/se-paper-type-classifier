@@ -24,6 +24,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rules import (  # noqa: E402
+    COMPILED,
     PRACTITIONER_SURVEY,
     PROTOCOL,
     SECONDARY_STUDY,
