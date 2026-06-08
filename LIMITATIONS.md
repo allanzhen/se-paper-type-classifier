@@ -55,9 +55,3 @@ Five papers were reclassified after initial labelling, all moving from Survey to
 
 **Mitigation**: All reclassifications were documented (see the git history of `data/gold/gold_standard_papers.csv`) and the final labels reflect the agreed definitions in our taxonomy.
 
----
-
-**8. The chi-square test for temporal trends has low power**
-The pre-2020 period only has 72 papers. With such a small group, the chi-square test may fail to detect real shifts simply because the sample is too small — not because no shift occurred.
-
-**Mitigation**: We report the result as "no statistically significant shift" rather than "no shift", and separately note the directional trend in SLRs (1.4% to 5.2%) as a descriptive observation.
