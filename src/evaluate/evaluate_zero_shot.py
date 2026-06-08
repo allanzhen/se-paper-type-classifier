@@ -3,8 +3,7 @@ Evaluate the zero-shot classifier against the hand-labeled gold set.
 
 The gold file (data/gold/gold_standard_papers.csv) has columns
 [paper_id, title, abstract, manual_label], with `manual_label` already
-standardized to the canonical label strings the classifier emits (no
-normalization needed here).
+standardized to the canonical label strings the classifier emits.
 
 Rather than re-running the DeBERTa model, we reuse the predictions already
 produced for the whole corpus by src/classify/zero_shot.py
