@@ -32,11 +32,9 @@ This document describes the datasets ingested, the cleaning steps applied, where
 
 The following steps were applied in order to produce the final corpus:
 
-| Step | Input | Output | N |
-|---|---|---|---|
-| Raw DBLP queries (21 queries, all results) | — | Raw hits | 3,128 |
-| CORE A/A* venue filter + year >= 2010 | 3,128 | Post-filter | 683 |
-| Abstract retrieval via Semantic Scholar | 683 | Papers with abstracts | 342 |
+1. **Raw DBLP queries** — 21 keyword searches run against DBLP with no filtering → **3,128 papers**
+2. **CORE A/A* venue filter + year ≥ 2010** — dropped anything before 2010 or from a non-A/A* venue → **683 papers**
+3. **Abstract retrieval via Semantic Scholar** — looked up each paper; kept only those with an abstract → **342 papers (final corpus)**
 
 **Venue normalisation**: Venue strings were lowercased, stripped of ordinal numbers, years, and common prefixes (e.g. "IEEE International Conference on") before matching against CORE rankings. Both full venue title and acronym were matched. Preprints (arXiv/CoRR) were excluded.
 
