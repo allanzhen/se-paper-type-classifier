@@ -1,4 +1,4 @@
-# SE Paper-Type Classifier — Technical Debt Research Landscape
+# SE Paper-Type Classifier: Technical Debt Research Landscape
 
 Software engineering research takes many forms: controlled experiments, systematic
 literature reviews, tool papers, experience reports, and more. The mix of paper types
